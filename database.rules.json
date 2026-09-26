@@ -1,0 +1,35 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    "liveBeds": {
+      "$hospitalId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+      }
+    },
+    "liveQueues": {
+      "$hospitalId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+      }
+    },
+    "hospitalStatus": {
+      "$hospitalId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'hospital_admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+      }
+    },
+    "emergencyCapacity": {
+      "$hospitalId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+      }
+    },
+    "currentTokens": {
+      "$hospitalId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+      }
+    }
+  }
+}
