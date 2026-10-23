@@ -19,6 +19,7 @@ import {
   UserCog,
   HeartPulse,
   UserPlus,
+  Bot,
 } from 'lucide-react';
 
 interface NavItem {
@@ -37,6 +38,7 @@ export const Sidebar: React.FC = () => {
       case 'patient':
         return [
           { label: 'Overview', path: '/patient/dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
+          { label: 'AI Booking Agent', path: '/patient/ai-booking', icon: <Bot className="h-4 w-4 text-sky-400" />, badge: 'AI Agent' },
           { label: 'Hospitals & Beds', path: '/patient/hospitals', icon: <Building2 className="h-4 w-4" /> },
           { label: 'Book OPD Slot', path: '/patient/book', icon: <Calendar className="h-4 w-4" /> },
           { label: 'Live Queue Tracker', path: '/patient/queue', icon: <Users className="h-4 w-4" />, badge: 'Live' },
@@ -48,6 +50,7 @@ export const Sidebar: React.FC = () => {
       case 'staff':
         return [
           { label: 'Doctor Desk & OPD', path: '/staff/dashboard', icon: <Stethoscope className="h-4 w-4" /> },
+          { label: 'AI Patient Booking', path: '/staff/ai-booking', icon: <Bot className="h-4 w-4 text-sky-400" />, badge: 'AI Agent' },
           { label: 'Patient Registration', path: '/staff/patients', icon: <UserPlus className="h-4 w-4" /> },
           { label: 'Live OPD Queue', path: '/staff/opd', icon: <Users className="h-4 w-4" />, badge: 'Live' },
           { label: 'Ward Beds & Census', path: '/staff/beds', icon: <Bed className="h-4 w-4" /> },

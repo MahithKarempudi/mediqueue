@@ -12,6 +12,8 @@ import {
   ArrowRight,
   User,
   Users,
+  Bot,
+  Sparkles,
 } from 'lucide-react';
 
 export const BookAppointmentPage: React.FC = () => {
@@ -143,6 +145,35 @@ export const BookAppointmentPage: React.FC = () => {
         <p className="mt-1 text-xs text-slate-400">
           Select your desired medical institution, specialty department, and preferred physician to generate your live digital queue token.
         </p>
+      </div>
+
+      {/* AI Appointment Agent Banner */}
+      <div className="rounded-2xl border border-sky-500/40 bg-gradient-to-r from-sky-950/60 via-slate-900 to-mediblue-950/60 p-5 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-sky-500 to-mediblue-600 flex items-center justify-center text-white shrink-0 shadow-md shadow-sky-500/20">
+            <Bot className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-white">MediQueue Controlled AI Agent</span>
+              <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-300 border border-sky-500/30 flex items-center gap-1">
+                <Sparkles className="h-3 w-3" />
+                Forensic Confirmation Card
+              </span>
+            </div>
+            <p className="mt-0.5 text-xs text-slate-300 leading-relaxed">
+              Prefer conversational booking? The AI prepares and revalidates your appointment with explicit confirmation, duplicate prevention, and SHA-256 audit logging.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => navigate('/patient/ai-booking')}
+          className="rounded-xl bg-sky-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-sky-500 transition shadow-md flex items-center justify-center gap-2 shrink-0"
+        >
+          <span>Launch AI Agent</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+        </button>
       </div>
 
       {successToken ? (

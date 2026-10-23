@@ -21,6 +21,7 @@ import { PatientReportsPage } from '@/pages/patient/PatientReportsPage';
 import { PatientBillingPage } from '@/pages/patient/PatientBillingPage';
 import { PatientTimelinePage } from '@/pages/patient/PatientTimelinePage';
 import { EmergencyRoutingPage } from '@/pages/patient/EmergencyRoutingPage';
+import { AiAppointmentBookingPage } from '@/pages/patient/AiAppointmentBookingPage';
 
 // Hospital Staff Portal Views
 import { WardBedsPage } from '@/pages/staff/WardBedsPage';
@@ -94,6 +95,7 @@ export const App: React.FC = () => {
             <Route path="dashboard" element={<PatientDashboard />} />
             <Route path="hospitals" element={<HospitalDirectoryPage />} />
             <Route path="book" element={<BookAppointmentPage />} />
+            <Route path="ai-booking" element={<AiAppointmentBookingPage />} />
             <Route path="queue" element={<LiveQueueTrackerPage />} />
             <Route path="reports" element={<PatientReportsPage />} />
             <Route path="billing" element={<PatientBillingPage />} />
@@ -120,6 +122,7 @@ export const App: React.FC = () => {
             <Route path="admissions" element={<IpdAdmissionsPage />} />
             <Route path="diagnostics" element={<DiagnosticOrdersPage />} />
             <Route path="billing" element={<StaffBillingPage />} />
+            <Route path="ai-booking" element={<AiAppointmentBookingPage />} />
           </Route>
 
           {/* ========================================================= */}
