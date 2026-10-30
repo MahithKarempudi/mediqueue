@@ -1,6 +1,6 @@
-// MediQueue AI: Controlled Appointment Confirmation Workflow & Forensics Types
+// MediQueue AI: Controlled Appointment Confirmation Workflow & Booking Types
 
-import type { User, UserRole } from './index';
+import type { UserRole } from './index';
 
 export type AppointmentWorkflowState =
   | 'IDLE'
@@ -66,47 +66,13 @@ export interface ConfirmedBookingResult {
   fee: number;
   status: 'CONFIRMED';
   committedAt: string;
-  forensicHash: string;
+  bookingReference: string;
 }
 
-export type ForensicEventType =
-  | 'BOOKING_REQUESTED'
-  | 'SLOT_SELECTED'
-  | 'CONFIRMATION_ATTEMPTED'
-  | 'BOOKING_COMMITTED'
-  | 'BOOKING_DENIED'
-  | 'RESCHEDULE_COMMITTED'
-  | 'APPOINTMENT_CANCELLED'
-  | 'AI_TOOL_FAILURE';
-
-export interface ForensicAuditEvent {
-  index: number;
-  id: string;
-  timestamp: string;
-  eventType: ForensicEventType;
-  severity: 'INFO' | 'WARN' | 'CRITICAL';
-  actor: {
-    uid: string;
-    role: UserRole;
-    name: string;
-    email?: string;
-  };
-  targetPatientId?: string;
-  hospitalId?: string;
-  requestId?: string;
-  appointmentId?: string;
-  details: string;
-  payloadHash: string;
-  previousHash: string;
-  currentHash: string;
-  tampered?: boolean;
-}
-
-export interface ChainVerificationResult {
-  isValid: boolean;
-  totalBlocks: number;
-  brokenIndex?: number;
-  brokenEventId?: string;
-  error?: string;
-  verifiedAt: string;
+export interface AppointmentWorkflowContext {
+  state: AppointmentWorkflowState;
+  selectedSlot: AppointmentSlot | null;
+  activeIntent: BookingIntent | null;
+  confirmedResult: ConfirmedBookingResult | null;
+  error: string | null;
 }

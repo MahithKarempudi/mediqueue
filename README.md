@@ -1,276 +1,299 @@
-# 🏥 MediQueue — Healthcare Operations & Cyber-Forensics Platform
+# 🏥 MediQueue AI — Real-Time Hospital Resource Management Platform
 
-> **Academic Prototype Notice**: MediQueue is an educational and research prototype built for academic demonstration. All patient records, physician names, hospitals, diagnostic reports, and operational metrics are **100% synthetic mock data**. It is **not** a certified medical device, is **not** HIPAA/GDPR certified, and must **never** be used for real patient care or live clinical decision-making.
+> **Academic Prototype Notice**: MediQueue AI is an educational and research software prototype built for academic demonstration. All patient records, physician names, hospitals, diagnostic reports, and operational metrics are **100% synthetic mock data**. It is **not** a certified medical device, is **not** HIPAA/GDPR certified, and must **never** be used for real patient care or live clinical decision-making.
 
 [![React 19](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-8.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-3.4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Vitest](https://img.shields.io/badge/Vitest-26%20Passed-green?logo=vitest&logoColor=white)](https://vitest.dev/)
-[![Security: RBAC Strict](https://img.shields.io/badge/Security-RBAC%20Least--Privilege-blue)](#-security-model--rbac-matrix)
-[![Forensics: SHA-256 Chain](https://img.shields.io/badge/Forensics-Tamper--Evident%20SHA--256-orange)](#-cyber-forensics-tamper-evident-audit-trail)
+[![Vitest](https://img.shields.io/badge/Vitest-23%20Passed-green?logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Security: Strict RBAC](https://img.shields.io/badge/Security-RBAC%20Least--Privilege-blue)](#-security-model--rbac-matrix)
+[![Deploy: Vercel & Firebase](https://img.shields.io/badge/Deployment-Ready-brightgreen)](#-production-deployment)
 
 ---
 
-## 🌟 Executive Overview
+## 🌟 1. Project Overview
 
-Hospital overcrowding, uncoordinated OPD queues, delayed bed turnovers, and emergency routing turnaways present major operational hurdles in modern healthcare. **MediQueue** demonstrates a cloud-native platform architecture resolving these challenges through:
+Modern healthcare facilities struggle with uncoordinated outpatient waiting times, delayed inpatient bed turnover, opaque physician schedules, and regional emergency turnaways. **MediQueue AI** is an intelligent, real-time hospital resource coordination and outpatient management platform built to streamline clinical workflows across five key healthcare roles:
 
-1. **5 Role-Based Portals** (Patient, Hospital Staff / Doctor, Hospital Admin, Government Officer, Super Admin).
-2. **"MediQueue AI Assistant — Ask, Find & Act"** with 6 allowlisted backend tools and role-scoped execution.
-3. **Controlled 4-Stage Appointment Confirmation Engine** featuring full-context slot identity, atomic 5-minute reservations, idempotency protection, and explicit consent validation.
-4. **Tamper-Evident Cyber-Forensics SHA-256 Audit Trail** with UTF-8 byte hashing, sequence verification, and payload recomputation for adversarial tamper detection.
-5. **Zero-Credential Local Demo Mode** featuring instant persona switching and persistent synthetic data indicators.
+1. **Patients**: Discover hospitals, locate doctors, reserve outpatient consultation slots with concurrency safety, track live OPD token numbers, view diagnostic reports, and interact with the **MediQueue AI Assistant**.
+2. **Hospital Staff & Clinicians**: Manage ward bed turnover across live states (`available`, `cleaning`, `occupied`, `maintenance`), operate outpatient token callers, and execute inpatient admissions and discharges.
+3. **Hospital Administrators**: Monitor real-time census metrics, analyze department-level bed occupancy, manage medical staff schedules, and review operational throughput.
+4. **Government & Public Health Officers**: Monitor district-level hospital capacity, detect public health surges (>85% bed occupancy), and compare regional healthcare utilization with strict PHI anonymization.
+5. **Super Administrators**: Onboard multi-tenant hospital facilities, configure system-wide access policies, and inspect central enterprise security and activity audit logs.
 
 ---
 
-## 🚀 Quick Start (Local Demo Mode)
+## ⚡ 2. Main Features
 
-MediQueue runs out-of-the-box locally **without requiring Firebase credentials, cloud infrastructure, or external paid AI API keys**.
+- **5 Dedicated Role Portals**: Tailored interfaces and strict authorization boundaries for Patient, Hospital Staff, Hospital Admin, Government Officer, and Super Admin.
+- **Hybrid MediQueue AI Assistant**:
+  - Natural language intent extraction mapped to an explicit **allowlist of 11 clinical tools**.
+  - Structured parameter validation and backend role authorization prior to execution.
+  - Consequential actions require explicit patient confirmation dialogs.
+  - Fully offline, rule-based fallback when no external LLM credentials are configured.
+- **Concurrency-Safe Appointment Booking Engine**:
+  - Composite slot identification (`slot_${hospitalId}_${deptId}_${doctorId}_${date}_${time}`).
+  - 5-minute pre-booking reservation hold to prevent double-booking.
+  - Pre-commit revalidation ensuring exclusive slots never exceed one confirmed booking.
+  - Complete appointment lifecycle: booking, status lookup, rescheduling, and cancellation.
+- **Real-Time Ward Bed Turnover**:
+  - Ward bed state transitions (`available`, `cleaning`, `occupied`, `maintenance`) updated live across all active client views.
+- **OPD Queue Desk**:
+  - Doctor token caller with active consultation velocity tracking and estimated waiting room duration.
+- **District Health Surveillance**:
+  - Regional bed occupancy heatmaps and automatic surge alert triggers without exposing identifiable patient records.
+- **Enterprise Activity & Security Logging**:
+  - Centralized, queryable event log capturing timestamp, actor identity, role, hospital scope, event category, and operational severity.
+- **Dual Operating Modes**:
+  - **Demonstration Mode**: Zero-credential local simulation with 5 synthetic hospitals, 180 beds, and 55 patients.
+  - **Cloud Mode**: Production-grade Firebase Authentication, Firestore database isolation, and Realtime Database live event synchronization.
 
-### 1. Prerequisites
+---
+
+## 🛠️ 3. Technology Stack
+
+- **Frontend Core**: React 19, TypeScript 5, Vite 8
+- **Styling**: Tailwind CSS, Lucide React Icons
+- **Data Visualization**: Recharts (Executive census, department occupancy, queue wait times)
+- **State & Real-Time Sync**: Reactive Local Storage & Web BroadcastChannel (Demo Mode) / Firebase Firestore & Realtime Database (Cloud Mode)
+- **Authentication**: Firebase Auth (Cloud Mode) / Persona Simulation Switcher (Demo Mode)
+- **Testing Framework**: Vitest, @testing-library/react
+- **Deployment**: Vercel (SPA rewrites via `vercel.json`), Firebase Hosting (`firebase.json`)
+
+---
+
+## 🏛️ 4. System Architecture
+
+```mermaid
+graph TD
+    Client([User Web Browser]) --> SPA[React 19 + TypeScript SPA]
+    
+    subgraph Role Routing Layer
+        SPA --> Router[Role-Guarded Router]
+        Router --> PatientView[Patient Portal]
+        Router --> StaffView[Hospital Staff Portal]
+        Router --> AdminView[Hospital Admin Portal]
+        Router --> GovtView[Government Portal]
+        Router --> SuperView[Super Admin Portal]
+        SPA --> AIChat[MediQueue AI Assistant]
+    end
+
+    subgraph Service & Engine Layer
+        AIChat --> IntentParser[Intent Extraction & Schema Validation]
+        IntentParser --> ToolAllowlist{11 Allowlisted Tools}
+        ToolAllowlist --> BookingEngine[Appointment Engine]
+        ToolAllowlist --> BedManager[Bed Management Service]
+        ToolAllowlist --> QueueManager[OPD Queue Service]
+        
+        BookingEngine --> ConcurrencyLock[5-Min Slot Hold + Pre-Commit Revalidation]
+    end
+
+    subgraph Enterprise Logging & Persistence
+        BookingEngine --> LogService[Activity Log Service]
+        BedManager --> LogService
+        QueueManager --> LogService
+        
+        LogService --> DB[(Firestore / Reactive Local Store)]
+        BedManager --> RTDB[(Firebase Realtime DB / BroadcastChannel)]
+    end
+```
+
+---
+
+## 📁 5. Repository Structure
+
+```
+mediqueue/
+├── .env.example             # Environment template (Firebase & LLM credentials)
+├── DEMO_SCRIPT.md           # 12-step guided university demonstration script
+├── DEPLOYMENT_GUIDE.md      # Turnkey Vercel & Firebase Hosting deployment instructions
+├── IMPLEMENTATION_AUDIT.md  # Detailed project audit & remediation report
+├── PRESENTATION_GUIDE.md    # Comprehensive faculty presentation guide & technical defenses
+├── database.rules.json      # Firebase Realtime Database security rules
+├── firestore.rules          # Firebase Cloud Firestore security rules
+├── firebase.json            # Firebase Hosting & rule deployment configuration
+├── vercel.json              # Vercel SPA route rewrite configuration
+├── package.json             # Scripts & dependencies
+├── src/
+│   ├── components/          # Reusable UI cards, modals, navigation & layouts
+│   ├── config/              # Firebase initialization & application constants
+│   ├── context/             # React context providers (AuthContext, DemoContext)
+│   ├── pages/               # 5 Role-based portal views & dashboards
+│   │   ├── admin/           # Hospital Admin views (Analytics, Beds, Staff)
+│   │   ├── government/      # Government views (Surveillance, Surge Alerts)
+│   │   ├── patient/         # Patient views (Directory, Booking, AI Assistant, Queue)
+│   │   ├── staff/           # Clinical Staff views (Ward Beds, OPD Queue, Admissions)
+│   │   └── superadmin/      # Super Admin views (Hospital Onboarding, Activity Logs)
+│   ├── services/            # Clinical domain services
+│   │   ├── ai/              # Hybrid MediQueue AI assistant (11 intents & tool handlers)
+│   │   ├── appointments/    # Concurrency-safe appointment booking engine
+│   │   ├── logging/         # Enterprise activity & security audit log service
+│   │   ├── firebase.ts      # Cloud Firebase connector
+│   │   └── mockStorage.ts   # Reactive local storage engine with synthetic seed data
+│   └── types/               # TypeScript data models & domain interfaces
+└── tests/                   # Automated Vitest test suites (23 tests)
+    ├── activity_logs.test.ts
+    ├── appointments_workflow.test.ts
+    ├── auth_permissions.test.ts
+    └── demo_behavior.test.ts
+```
+
+---
+
+## 🚀 6. Installation Instructions
+
+### Prerequisites
 - **Node.js**: v18.0.0 or later (v20+ recommended)
 - **npm**: v9.0.0 or later
 
-### 2. Installation & Launch
-
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/MahithKarempudi/mediqueue.git
 cd mediqueue
 
-# Install dependencies (including React 19, Vite 8, Recharts, Vitest)
+# 2. Install dependencies
 npm install
 
-# Start the local development server (runs in Demo Mode by default)
+# 3. Launch local development server
 npm run dev
 ```
 
-Open your browser at: **`http://localhost:5173`** (or the port displayed in the terminal).
+Open your browser at **`http://localhost:5173`**. The application launches immediately in **Demonstration Mode** with zero cloud credentials required.
 
-### 3. Running Automated Tests
+---
+
+## ⚙️ 7. Environment Setup
+
+MediQueue runs out-of-the-box locally without an `.env` file. To connect to live cloud services, create a `.env` file in the project root:
 
 ```bash
-# Run all 26 automated unit and security tests via Vitest
-npm test
+cp .env.example .env
+```
 
-# Run build verification (TypeScript compile + Vite production bundle)
+Configure your credentials:
+```env
+# Mode Selector: 'demo' or 'cloud'
+VITE_APP_MODE=demo
+
+# Firebase Cloud Configuration (Required for Cloud Mode)
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+VITE_FIREBASE_DATABASE_URL=https://your_project-default-rtdb.firebaseio.com
+
+# Optional Cloud LLM API Keys (Groq, OpenAI, or Gemini)
+# If left blank, MediQueue activates its built-in rule-based intent parser
+VITE_AI_PROVIDER=rule_based
+VITE_GROQ_API_KEY=
+VITE_OPENAI_API_KEY=
+VITE_GEMINI_API_KEY=
+```
+
+---
+
+## 👥 8. Demo Login Instructions & Personas
+
+When running in Demonstration Mode, use the top-bar **Persona Switcher** to test all 5 stakeholder roles instantly without passwords:
+
+| Persona | Role | Simulated Identity | Core Authorized Capabilities |
+| :--- | :--- | :--- | :--- |
+| **Priya Sharma** | `patient` | `pat_demo_01` | Search doctors, book OPD slots, converse with AI Assistant, track live queue tokens, view own bills and diagnostic records. |
+| **Dr. Rajesh Kumar** | `staff` | `hosp_metro_01` | Update ward bed status (`available`, `cleaning`, `occupied`), call OPD tokens, issue clinical prescriptions. |
+| **Sunita Rao** | `hospital_admin` | `hosp_metro_01` | Review executive hospital census, inspect department bed utilization, manage clinical staff rosters. |
+| **Vikramaditya Sen** | `government_officer` | District Directorate | View district bed occupancy heatmaps and hospital surge alerts. **Strictly blocked from individual patient PHI**. |
+| **Dev Anand** | `super_admin` | System Directorate | Onboard new hospital tenants, provision administrator accounts, inspect central enterprise activity audit logs. |
+
+---
+
+## ☁️ 9. Firebase Setup (Cloud Mode)
+
+To run with live Firebase Cloud infrastructure:
+1. Create a project at the [Firebase Console](https://console.firebase.google.com/).
+2. Enable **Authentication** (Email/Password provider).
+3. Enable **Cloud Firestore** and deploy security rules:
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
+4. Enable **Realtime Database** and deploy database rules:
+   ```bash
+   firebase deploy --only database
+   ```
+5. Set `VITE_APP_MODE=cloud` and paste your Firebase credentials into `.env`.
+
+---
+
+## 🤖 10. AI Provider Setup
+
+The **MediQueue AI Assistant** supports 11 structured clinical intents:
+- `searchHospitals`, `searchDepartments`, `searchAppointmentSlots`, `bookAppointment`, `checkAppointmentStatus`, `rescheduleAppointment`, `cancelAppointment`, `checkBedAvailability`, `checkOpdQueueStatus`, `updateBedStatus`, `getHospitalOperationalSummary`.
+
+### Operating Options:
+1. **Rule-Based Engine (Default / Zero-Config)**: Operates out-of-the-box locally with zero external API calls or latency.
+2. **Groq / Llama 3**: Provide `VITE_GROQ_API_KEY` for serverless open-source LLM inference.
+3. **OpenAI GPT-4o / Gemini**: Provide `VITE_OPENAI_API_KEY` or `VITE_GEMINI_API_KEY`.
+
+---
+
+## 💻 11. Local Execution
+
+```bash
+# Start Vite development server
+npm run dev
+
+# Run linting and code quality checks
+npm run lint
+
+# Build production bundle for verification
 npm run build
 ```
 
 ---
 
-## 🔑 Demo Personas & Simulation Switcher
+## 🌐 12. Production Deployment
 
-In Demo Mode, a persistent **"DEMO MODE — SYNTHETIC DATA"** banner is anchored to the header. A top-bar **"Persona Switcher (Simulation Only)"** allows instant evaluation of all 5 stakeholder roles without entering credentials.
+### Option A: Vercel (Recommended for Showcase)
+1. Push your repository to GitHub.
+2. Import the project in [Vercel](https://vercel.com).
+3. Vercel automatically detects the Vite preset and uses [vercel.json](file:///Users/mahithchowdary/.gemini/antigravity-ide/scratch/mediqueue/vercel.json) for SPA routing.
+4. Click **Deploy**.
 
-> ⚠️ **Academic Simulation Notice**: The Persona Switcher is strictly a local educational simulation tool. It is automatically disabled when production Firebase credentials are provided. Client-side role claims are never trusted for cloud authorization.
+### Option B: Firebase Hosting
+1. Build the production bundle: `npm run build`
+2. Deploy to Firebase: `firebase deploy --only hosting`
 
-| Persona | Role | Simulated Identity | Core Authorized Capabilities |
-| :--- | :--- | :--- | :--- |
-| **Priya Sharma** | `patient` | `pat_demo_01` | Book OPD slots, track live token queue, check hospital bed capacity, view own bills and diagnostic records, chat with AI Assistant. |
-| **Dr. Rajesh Kumar** | `staff` | `hosp_metro_01` (Cardiology) | Call OPD tokens, write prescriptions, view assigned hospital beds, update bed status (available, cleaning, maintenance), query hospital queue. |
-| **Sunita Rao** | `hospital_admin` | `hosp_metro_01` | Manage ward bed inventory, department staffing, review census & revenue analytics, export hospital operational reports. |
-| **Vikramaditya Sen** | `government_officer` | District Directorate | View city-wide hospital surge map, district bed occupancy heatmaps, aggregate epidemiology statistics. **Strictly restricted from viewing individual patient records**. |
-| **Dev Anand** | `super_admin` | System Directorate | Onboard new hospitals, inspect platform audit log hash chains, verify cryptographic integrity, trigger adversarial tamper simulations. |
-
----
-
-## 🛡️ Security Model & RBAC Matrix
-
-MediQueue adheres to the **Principle of Least Privilege**:
-
-| Feature / Resource | Patient | Hospital Staff | Hospital Admin | Government Officer | Super Admin |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Personal Health Records (PHI)** | ✅ (Own Only) | ✅ (Assigned Hosp) | ❌ | ❌ (Aggregate Only) | ❌ |
-| **Slot Search & OPD Booking** | ✅ | ✅ (Assigned Hosp) | ❌ | ❌ | ❌ |
-| **Ward Bed Status Updates** | ❌ | ✅ (Assigned Hosp) | ✅ (Assigned Hosp) | ❌ | ❌ |
-| **Live Queue Token Calling** | ❌ | ✅ (Assigned Dept) | ❌ | ❌ | ❌ |
-| **Hospital Operational Analytics** | ❌ | ❌ | ✅ (Assigned Hosp) | ❌ | ❌ |
-| **District Surge Surveillance** | ❌ | ❌ | ❌ | ✅ (Aggregate Only) | ✅ |
-| **Forensic Audit Hash Verification**| ❌ | ❌ | ❌ | ❌ | ✅ |
-| **Tamper Simulation (Demo Only)** | ❌ | ❌ | ❌ | ❌ | ✅ |
-
-### Security Rules Implementation
-- **`firestore.rules`**: Prevents client-side privilege escalation (`affectedKeys().hasAny(['role', 'hospitalId', 'patientId'])`), enforces hospital scope matching, limits patient record reads to resource owners, and restricts government officers strictly to `daily_reports` and `monthly_reports`.
-- **`database.rules.json`**: Broad root `.read` has been **completely removed**. Realtime nodes (`liveBeds/$hospitalId`, `liveQueues/$hospitalId`) require authenticated tokens matching the target hospital scope.
-- **Fail-Safe Persistence Seam**: In cloud mode, any Firestore/RTDB failure throws an explicit, user-facing error and **never** silently degrades to a mock write.
+For comprehensive deployment instructions, consult [DEPLOYMENT_GUIDE.md](file:///Users/mahithchowdary/.gemini/antigravity-ide/scratch/mediqueue/DEPLOYMENT_GUIDE.md).
 
 ---
 
-## 📅 Reliable Appointment Confirmation Workflow
+## 🧪 13. Testing Instructions
 
-MediQueue enforces an authoritative, backend-mediated 4-stage appointment confirmation engine:
-
-```
-[1. Full-Context Slot Discovery] 
-       ↓ (Hospital + Specialty + Doctor + Date + Time)
-[2. Intent Preparation & 5-Min Lock] 
-       ↓ (Status: AWAITING_CONFIRMATION)
-[3. User Review Card & Explicit Consent] 
-       ↓ (Consultation Type Selector + Fee Summary + Mandatory Consent Checkbox)
-[4. Backend Concurrency Revalidation & Atomic Commit]
-       ↓ (Idempotency Key Verification + Collision Detection)
-[5. Authoritative Token Issued & Forensic Audit Logged]
-```
-
-### Key Workflow Safeguards:
-- **Full-Context Slot Identity**: Slots encapsulate `hospitalId`, `departmentId`, `doctorId`, `date`, and `time`—eliminating ambiguity.
-- **Atomic 5-Minute Hold**: Placing an intent reserves the slot temporarily; expired intents are automatically released.
-- **Mandatory Consent Checkbox**: Bookings cannot proceed without an explicit authorization action from the patient.
-- **Idempotency Protection**: Rapid double-clicks or repeated submissions with the same idempotency key return the committed record without duplicating bookings or queue tokens.
-- **Concurrent Collision Handling**: If another user reserves a slot concurrently, the backend aborts the transaction cleanly with a descriptive message and invites the user to select an alternate slot.
-
----
-
-## 🤖 MediQueue AI Assistant — Ask, Find & Act
-
-Integrated across all 5 portals, the **MediQueue AI Assistant** executes actions exclusively through **6 narrow, allowlisted backend tools**:
-
-1. `searchAppointmentSlots`: Finds available OPD slots filtered by specialty and authorized facility.
-2. `getMyAppointments`: Retrieves appointments strictly belonging to the caller's verified identity.
-3. `getRequestStatus`: Inspects the real-time status of pending booking intents and queue positions.
-4. `getAuthorizedBedAvailability`: Queries ward bed occupancies scoped to the user's hospital.
-5. `getHospitalOperationalSummary`: Computes bed turnover and census metrics for administrators.
-6. `updateBedStatus`: Authorizes staff to transition bed states (`available`, `cleaning`, `occupied`, `maintenance`).
-
-### Architecture & Safety Principles:
-- **User Prompt → AI Dispatcher → Tool Allowlist → RBAC & Scope Validator → Authoritative Backend → Forensic Audit → Result Card**.
-- **Transparent Demo Engine**: Operates locally with a high-fidelity rule-based engine when external LLM APIs are not configured. Clearly explains to users that AI advice does not replace medical consultation.
-- **Consequential Actions Require Consent**: The assistant prepares booking intents and structured confirmation cards; it never commits medical reservations autonomously.
-
----
-
-## 🔍 Cyber-Forensics Tamper-Evident Audit Trail
-
-MediQueue features an append-only, SHA-256 cryptographic audit chain (`src/services/forensics/auditChainService.ts`) providing verifiable provenance for all sensitive actions:
-
-- **Genesis Block**: Root block anchored at index 0 with standard previous hash `0000000000000000000000000000000000000000000000000000000000000000`.
-- **UTF-8 Byte Hashing**: RFC 6234 compliant SHA-256 implementation operating strictly on canonical UTF-8 bytes to ensure consistent hashing across non-ASCII characters and emojis.
-- **Payload Recomputation**: Chain verification does not merely trust stored payload hashes—it recomputes `sha256(canonicalPayload)` from stored event fields to detect in-place column tampering.
-- **Adversarial Tamper Simulation**: Super Admins can simulate an adversary altering an event payload or deleting a block, demonstrating how the chain verifier pinpoints the exact tampered index.
-
----
-
-## 🧪 Automated Test Suite
-
-MediQueue includes 26 automated unit, security, and workflow tests executed via **Vitest**:
+MediQueue includes automated unit, integration, and security tests powered by **Vitest**:
 
 ```bash
-npx vitest run
+npm test
 ```
 
-### Test Coverage Summary:
-- **`tests/forensics_chain.test.ts` (7 tests)**:
-  - Genesis block generation & standard 64-char zero-anchor verification.
-  - 100% integrity validation on untouched chains.
-  - In-place adversary payload tampering detection.
-  - Block deletion and sequence discontinuity detection.
-  - Block reordering detection.
-  - Genesis anchor previousHash tampering detection.
-  - Deterministic Unicode and emoji UTF-8 hashing.
-- **`tests/auth_permissions.test.ts` (7 tests)**:
-  - Cross-patient appointment access denial.
-  - Cross-patient booking intent creation rejection.
-  - Staff foreign hospital slot query rejection.
-  - Staff foreign hospital appointment record viewing rejection.
-  - Government officer clinical slot query denial.
-  - Government officer booking intent rejection.
-  - Patient bed status modification rejection.
-- **`tests/appointments_workflow.test.ts` (8 tests)**:
-  - Valid slot search execution.
-  - Booking intent creation with 5-minute hold in `AWAITING_CONFIRMATION` state.
-  - Confirmation rejection without explicit consent.
-  - Atomic booking commit, token assignment, and forensic hash generation.
-  - Idempotency key duplicate protection.
-  - Concurrent slot collision handling.
-  - Non-owner cancellation rejection.
-  - Owner cancellation with explicit authorization.
-- **`tests/demo_behavior.test.ts` (4 tests)**:
-  - Deterministic synthetic seeding (5 hospitals, 180 beds, 55 patients, 460 visits).
-  - Credential-free switching across all 5 demo personas.
-  - Total storage isolation & clean re-seeding.
-  - Synthetic data verification (no real PHI).
+### Verified Test Suites (23 / 23 Tests Passing):
+- **`activity_logs.test.ts`**: Verifies enterprise activity log ingestion, filtering by category (`APPOINTMENT`, `BED_STATUS`, `AUTH`), actor identity tracking, and severity thresholds.
+- **`auth_permissions.test.ts`**: Verifies strict role-based access control (RBAC), facility isolation, and denial of unauthorized cross-tenant operations.
+- **`appointments_workflow.test.ts`**: Verifies the complete 4-stage appointment lifecycle: slot searching, 5-minute hold placement, consent validation, atomic confirmation, and rescheduling.
+- **`demo_behavior.test.ts`**: Verifies deterministic synthetic seeding of 5 hospitals, 180 beds, and 55 patients.
 
 ---
 
-## ⚙️ Environment Configuration (Cloud Mode)
+## ⚠️ 14. Current Limitations & Academic Disclaimer
 
-To run MediQueue against a live Firebase project instead of Demo Mode:
-
-1. Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-2. Populate the required Firebase configuration values:
-   ```env
-   VITE_FIREBASE_API_KEY="your-api-key"
-   VITE_FIREBASE_AUTH_DOMAIN="your-project.firebaseapp.com"
-   VITE_FIREBASE_PROJECT_ID="your-project-id"
-   VITE_FIREBASE_STORAGE_BUCKET="your-project.appspot.com"
-   VITE_FIREBASE_MESSAGING_SENDER_ID="your-sender-id"
-   VITE_FIREBASE_APP_ID="your-app-id"
-   VITE_FIREBASE_DATABASE_URL="https://your-project-default-rtdb.firebaseio.com"
-   ```
-3. When these variables are provided, MediQueue connects directly to Firestore and Realtime Database, automatically disabling the simulation persona switcher and enforcing cloud security rules.
+- **Academic Simulation**: MediQueue is strictly an educational software engineering prototype. All clinical data is synthetic.
+- **Not a Medical Device**: The platform is not certified for clinical diagnostic use, triage decision-making, or emergency dispatch.
+- **Demo Mode Seam**: In Demo Mode, cross-tab synchronization uses browser BroadcastChannels rather than websockets.
+- **Regulatory Status**: The platform has not undergone HIPAA, GDPR, or HITECH regulatory compliance audits.
 
 ---
 
-## 📂 Repository Structure
+## 📄 License
 
-```
-mediqueue/
-├── public/                       # Static branding and assets
-├── scripts/
-│   └── seed.ts                   # CLI synthetic seeding runner
-├── src/
-│   ├── components/
-│   │   ├── appointments/         # AppointmentConfirmationCard & Booking Review
-│   │   ├── auth/                 # ProtectedRoute & RBAC security guards
-│   │   └── layout/               # Navbar (with Demo Mode Badge), Sidebar, Layout
-│   ├── context/
-│   │   └── AuthContext.tsx       # Auth provider & demo persona switcher
-│   ├── pages/
-│   │   ├── admin/                # Hospital Admin dashboard, beds, analytics & reports
-│   │   ├── auth/                 # Login & 403 Forbidden screens
-│   │   ├── government/           # Public health surge map & compliance reports
-│   │   ├── patient/              # OPD booking, AI Assistant, live queue, billing, timeline
-│   │   ├── staff/                # Ward bed manager, OPD desk, IPD admissions, diagnostics
-│   │   └── superadmin/           # Hospital onboarding, accounts, and forensic audit timeline
-│   ├── services/
-│   │   ├── ai/                   # AI Assistant orchestration engine & allowlisted tools
-│   │   ├── appointments/         # Concurrency-safe appointment backend & holds
-│   │   ├── db/                   # Dual persistence adapter (Firestore / Local Seam)
-│   │   ├── firebase.ts           # Firebase SDK initialization
-│   │   ├── forensics/            # RFC 6234 UTF-8 SHA-256 audit hash chain service
-│   │   ├── mockStorage.ts        # Reactive storage engine + cross-tab synchronization
-│   │   └── seed/                 # Deterministic synthetic data generators
-│   ├── types/                    # Domain models, appointments workflow, and RBAC types
-│   ├── App.tsx                   # Central router & role-protected route tree
-│   ├── index.css                 # Tailwind CSS tokens
-│   └── main.tsx                  # App bootstrap & auto-seeding entry point
-├── tests/                        # Vitest automated test suites
-│   ├── appointments_workflow.test.ts
-│   ├── auth_permissions.test.ts
-│   ├── demo_behavior.test.ts
-│   └── forensics_chain.test.ts
-├── database.rules.json           # Firebase Realtime Database security rules
-├── firestore.rules               # Firebase Firestore security rules
-├── DEMO_SCRIPT.md                # 5-7 minute professor presentation guide
-├── package.json
-└── tsconfig.json
-```
-
----
-
-## ⚠️ Known Limitations & Remaining Risks
-
-1. **Hash Chain Immutability**: A client-side hash chain is **tamper-evident, not tamper-proof**. If an adversary has write access to the underlying storage medium, they could theoretically recompute subsequent blocks. In production, chain tips must be anchored periodically to an immutable external ledger or write-once cloud storage.
-2. **Local Concurrency Scope**: In demo mode, concurrency checks and slot holds use local in-memory locking and browser `BroadcastChannel`. In multi-tenant cloud deployments, concurrency must be enforced via Cloud Firestore distributed transactions or Cloud Functions.
-3. **Synthetic Dataset Scope**: All medical metrics, triage scores, and medication lists are fictional representations. Clinical efficacy is not validated.
-
----
-
-## 📜 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License — see the [LICENSE](file:///Users/mahithchowdary/.gemini/antigravity-ide/scratch/mediqueue/LICENSE) file for details.

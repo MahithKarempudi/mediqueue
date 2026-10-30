@@ -238,8 +238,8 @@ service cloud.firestore {
       allow write: if isAuthenticated() && (isHospitalAdmin() || isSuperAdmin());
     }
 
-    // 16. Audit Log Records (Append-only by backend/authorized staff, no deletion)
-    match /forensic_audit_events/{eventId} {
+    // 16. Activity & Security Audit Logs (Append-only by backend/authorized staff, no deletion)
+    match /activity_logs/{logId} {
       allow read: if isAuthenticated() && (isSuperAdmin() || isHospitalAdmin());
       allow create: if isAuthenticated();
       allow update, delete: if false; // Append-only immutable audit trail

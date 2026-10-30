@@ -81,7 +81,7 @@ describe('Appointments Workflow & Concurrency Control', () => {
     expect(confirmRes.state).toBe('AWAITING_CONFIRMATION');
   });
 
-  it('atomically commits booking, generates token, and returns cryptographic forensic hash', async () => {
+  it('atomically commits booking, generates token, and returns authoritative booking reference', async () => {
     const searchRes = await aiAppointmentBackend.searchAppointmentSlots({}, patientA);
     const slot = searchRes.slots[0];
     const { intent } = await aiAppointmentBackend.createBookingIntent(
@@ -107,7 +107,7 @@ describe('Appointments Workflow & Concurrency Control', () => {
     expect(res.appointmentId).toMatch(/^APT-\d{4}-\d+$/);
     expect(res.tokenNo).toBeGreaterThanOrEqual(1);
     expect(res.consultationType).toBe('teleconsult');
-    expect(res.forensicHash).toHaveLength(64);
+    expect(res.bookingReference).toBe(res.appointmentId);
 
     // Verify appointment was persisted in database
     const storedAppt = await dbService.getDocument('opd_appointments', res.appointmentId);

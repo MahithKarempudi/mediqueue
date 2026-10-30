@@ -11,7 +11,7 @@ import type {
   ConsultationType,
 } from '@/types/appointmentWorkflow';
 import { dbService } from '../db';
-import { auditChainService } from '../forensics/auditChainService';
+import { activityLogService } from '../logging/activityLogService';
 
 // In-memory slot availability and hold store (simulates database row-level locking)
 const slotStore: Record<string, { available: boolean; heldByIntentId?: string; expiresAt?: number }> = {};
@@ -113,22 +113,22 @@ export const aiAppointmentBackend = {
         });
       });
 
-      // Audit Log: Search slots event
-      auditChainService.appendEvent({
-        eventType: 'SLOT_SELECTED',
+      // Activity Log: Search slots event
+      activityLogService.logActivity({
+        eventType: 'SLOT_SEARCH',
         severity: 'INFO',
         actor: { uid: caller.uid, role: caller.role, name: caller.name, email: caller.email },
         hospitalId: targetHospital.hospitalId,
-        details: `Queried availability for specialty '${params.specialty || 'General'}' at [${targetHospital.name}]. Found ${slots.length} slots.`,
+        actionSummary: `Queried availability for specialty '${params.specialty || 'General'}' at [${targetHospital.name}]. Found ${slots.length} slots.`,
       });
 
       return { slots };
     } catch (e: any) {
-      auditChainService.appendEvent({
-        eventType: 'AI_TOOL_FAILURE',
+      activityLogService.logActivity({
+        eventType: 'ACCESS_DENIED',
         severity: 'WARN',
         actor: { uid: caller.uid, role: caller.role, name: caller.name },
-        details: `Slot search failure: ${e.message}`,
+        actionSummary: `Slot search failure: ${e.message}`,
       });
       return { slots: [], error: e.message };
     }
@@ -160,12 +160,12 @@ export const aiAppointmentBackend = {
     if (caller.role === 'patient') {
       // Patient can only book for themselves or registered dependent
       if (caller.patientId && targetPatientId !== caller.patientId) {
-        auditChainService.appendEvent({
-          eventType: 'BOOKING_DENIED',
+        activityLogService.logActivity({
+          eventType: 'ACCESS_DENIED',
           severity: 'WARN',
           actor: { uid: caller.uid, role: caller.role, name: caller.name },
           targetPatientId,
-          details: `Cross-patient booking violation. Patient [${caller.patientId}] attempted to create intent for [${targetPatientId}].`,
+          actionSummary: `Cross-patient booking violation. Patient [${caller.patientId}] attempted to create intent for [${targetPatientId}].`,
         });
         return { error: 'FORBIDDEN: You are only authorized to create bookings for your own verified patient identity.' };
       }
@@ -220,15 +220,14 @@ export const aiAppointmentBackend = {
 
     intentStore[intentId] = intent;
 
-    // Audit Log: Intent Created
-    auditChainService.appendEvent({
-      eventType: 'BOOKING_REQUESTED',
+    // Activity Log: Intent Created
+    activityLogService.logActivity({
+      eventType: 'BOOKING_INTENT_CREATED',
       severity: 'INFO',
       actor: { uid: caller.uid, role: caller.role, name: caller.name, email: caller.email },
       targetPatientId,
       hospitalId: params.slot.hospitalId,
-      requestId: intentId,
-      details: `Prepared booking intent #${intentId} for ${intent.specialty} with ${intent.doctorName} on ${intent.requestedDate} ${intent.preferredTime}. State: AWAITING_CONFIRMATION.`,
+      actionSummary: `Prepared booking intent #${intentId} for ${intent.specialty} with ${intent.doctorName} on ${intent.requestedDate} ${intent.preferredTime}. State: AWAITING_CONFIRMATION.`,
     });
 
     return { intent };
@@ -261,12 +260,11 @@ export const aiAppointmentBackend = {
 
     // 3. Mandatory Consent Check (Section 1 Step 6)
     if (!params.consentConfirmed) {
-      auditChainService.appendEvent({
-        eventType: 'BOOKING_DENIED',
+      activityLogService.logActivity({
+        eventType: 'ACCESS_DENIED',
         severity: 'WARN',
         actor: { uid: caller.uid, role: caller.role, name: caller.name },
-        requestId: params.intentId,
-        details: 'Confirmation rejected: Missing explicit patient consent check.',
+        actionSummary: 'Confirmation rejected: Missing explicit patient consent check.',
       });
       return {
         error: 'CONSENT_REQUIRED: Patient must explicitly check the confirmation authorization box before booking can be committed.',
@@ -278,12 +276,11 @@ export const aiAppointmentBackend = {
     if (caller.role === 'patient') {
       const callerPatientId = caller.patientId || caller.uid;
       if (intent.patientId !== callerPatientId) {
-        auditChainService.appendEvent({
-          eventType: 'BOOKING_DENIED',
+        activityLogService.logActivity({
+          eventType: 'ACCESS_DENIED',
           severity: 'WARN',
           actor: { uid: caller.uid, role: caller.role, name: caller.name },
-          requestId: params.intentId,
-          details: `Ownership authorization failure. Caller [${callerPatientId}] does not own intent [${intent.intentId}].`,
+          actionSummary: `Ownership authorization failure. Caller [${callerPatientId}] does not own intent [${intent.intentId}].`,
         });
         return { error: 'FORBIDDEN: You do not have permission to authorize this booking intent.', state: 'FAILED' };
       }
@@ -292,13 +289,11 @@ export const aiAppointmentBackend = {
     // 5. Duplicate Request / Idempotency Check (Section 5)
     if (committedIdempotencyKeys[params.idempotencyKey]) {
       const cachedResult = committedIdempotencyKeys[params.idempotencyKey];
-      auditChainService.appendEvent({
-        eventType: 'CONFIRMATION_ATTEMPTED',
+      activityLogService.logActivity({
+        eventType: 'APPOINTMENT_CONFIRMED',
         severity: 'INFO',
         actor: { uid: caller.uid, role: caller.role, name: caller.name },
-        requestId: params.intentId,
-        appointmentId: cachedResult.appointmentId,
-        details: `Duplicate confirmation submission detected with key [${params.idempotencyKey}]. Returned cached committed record.`,
+        actionSummary: `Duplicate confirmation submission detected with key [${params.idempotencyKey}]. Returned cached committed record.`,
       });
       return { result: cachedResult, state: 'CONFIRMED' };
     }
@@ -306,12 +301,11 @@ export const aiAppointmentBackend = {
     // 6. Hold Expiration Check
     if (new Date() > new Date(intent.expiresAt)) {
       intent.status = 'EXPIRED';
-      auditChainService.appendEvent({
-        eventType: 'BOOKING_DENIED',
+      activityLogService.logActivity({
+        eventType: 'ACCESS_DENIED',
         severity: 'WARN',
         actor: { uid: caller.uid, role: caller.role, name: caller.name },
-        requestId: params.intentId,
-        details: `Booking window expired. Confirmation received after hold deadline ${intent.expiresAt}.`,
+        actionSummary: `Booking window expired. Confirmation received after hold deadline ${intent.expiresAt}.`,
       });
       return { error: 'EXPIRED: The 5-minute hold window for this slot has expired. Please select a new slot.', state: 'EXPIRED' };
     }
@@ -320,12 +314,11 @@ export const aiAppointmentBackend = {
     if (params.simulateCollision || simulatedCollisionSlotId) {
       intent.status = 'UNAVAILABLE';
       simulatedCollisionSlotId = null;
-      auditChainService.appendEvent({
-        eventType: 'BOOKING_DENIED',
+      activityLogService.logActivity({
+        eventType: 'ACCESS_DENIED',
         severity: 'WARN',
         actor: { uid: caller.uid, role: caller.role, name: caller.name },
-        requestId: params.intentId,
-        details: `Race condition collision detected. Slot was claimed by another patient during revalidation.`,
+        actionSummary: `Race condition collision detected. Slot was claimed by another patient during revalidation.`,
       });
       return {
         error: 'UNAVAILABLE: The selected slot was booked by another patient milliseconds before confirmation. Please choose an alternate slot.',
@@ -380,16 +373,14 @@ export const aiAppointmentBackend = {
       // Transition state to CONFIRMED
       intent.status = 'CONFIRMED';
 
-      // Log Cryptographic Audit Trail Event
-      const auditLog = auditChainService.appendEvent({
-        eventType: 'BOOKING_COMMITTED',
+      // Log Enterprise Security Activity Event
+      activityLogService.logActivity({
+        eventType: 'APPOINTMENT_CONFIRMED',
         severity: 'INFO',
         actor: { uid: caller.uid, role: caller.role, name: caller.name, email: caller.email },
         targetPatientId: intent.patientId,
         hospitalId: intent.hospitalId,
-        requestId: params.intentId,
-        appointmentId: authoritativeAppointmentId,
-        details: `Committed booking ${authoritativeAppointmentId} (Token #${assignedTokenNo}) for ${intent.specialty} with ${intent.doctorName}. Type: ${intent.consultationType}.`,
+        actionSummary: `Committed booking ${authoritativeAppointmentId} (Token #${assignedTokenNo}) for ${intent.specialty} with ${intent.doctorName}. Type: ${intent.consultationType}.`,
       });
 
       const confirmedResult: ConfirmedBookingResult = {
@@ -407,7 +398,7 @@ export const aiAppointmentBackend = {
         fee: intent.fee,
         status: 'CONFIRMED',
         committedAt: new Date().toISOString(),
-        forensicHash: auditLog.currentHash,
+        bookingReference: authoritativeAppointmentId,
       };
 
       // Store in idempotency registry
@@ -415,12 +406,11 @@ export const aiAppointmentBackend = {
 
       return { result: confirmedResult, state: 'CONFIRMED' };
     } catch (err: any) {
-      auditChainService.appendEvent({
-        eventType: 'AI_TOOL_FAILURE',
-        severity: 'CRITICAL',
+      activityLogService.logActivity({
+        eventType: 'ACCESS_DENIED',
+        severity: 'ERROR',
         actor: { uid: caller.uid, role: caller.role, name: caller.name },
-        requestId: params.intentId,
-        details: `Atomic booking commit failed: ${err.message}`,
+        actionSummary: `Atomic booking commit failed: ${err.message}`,
       });
       return { error: `COMMIT_FAILED: Backend database error: ${err.message}`, state: 'FAILED' };
     }
@@ -447,12 +437,11 @@ export const aiAppointmentBackend = {
     if (caller.role === 'patient') {
       const callerPatientId = caller.patientId || caller.uid;
       if (appt.patientId !== callerPatientId) {
-        auditChainService.appendEvent({
-          eventType: 'BOOKING_DENIED',
+        activityLogService.logActivity({
+          eventType: 'ACCESS_DENIED',
           severity: 'WARN',
           actor: { uid: caller.uid, role: caller.role, name: caller.name },
-          appointmentId,
-          details: `Patient [${callerPatientId}] attempted unauthorized view of appointment [${appointmentId}] belonging to [${appt.patientId}].`,
+          actionSummary: `Patient [${callerPatientId}] attempted unauthorized view of appointment [${appointmentId}] belonging to [${appt.patientId}].`,
         });
         return { error: 'FORBIDDEN: You do not have permission to view other patients\' appointment records.' };
       }
@@ -489,14 +478,13 @@ export const aiAppointmentBackend = {
       status: 'cancelled',
     });
 
-    auditChainService.appendEvent({
+    activityLogService.logActivity({
       eventType: 'APPOINTMENT_CANCELLED',
       severity: 'INFO',
       actor: { uid: caller.uid, role: caller.role, name: caller.name, email: caller.email },
-      appointmentId: params.appointmentId,
       hospitalId: appointment.hospitalId,
       targetPatientId: appointment.patientId,
-      details: `Appointment ${params.appointmentId} cancelled by ${caller.role}. Reason: ${params.reason}`,
+      actionSummary: `Appointment ${params.appointmentId} cancelled by ${caller.role}. Reason: ${params.reason}`,
     });
 
     return { success: true };
@@ -526,14 +514,13 @@ export const aiAppointmentBackend = {
       slotTime: params.newSlotTime,
     });
 
-    auditChainService.appendEvent({
-      eventType: 'RESCHEDULE_COMMITTED',
+    activityLogService.logActivity({
+      eventType: 'APPOINTMENT_RESCHEDULED',
       severity: 'INFO',
       actor: { uid: caller.uid, role: caller.role, name: caller.name },
-      appointmentId: params.appointmentId,
       hospitalId: appointment.hospitalId,
       targetPatientId: appointment.patientId,
-      details: `Rescheduled appointment ${params.appointmentId} to new slot: ${params.newSlotTime}.`,
+      actionSummary: `Rescheduled appointment ${params.appointmentId} to new slot: ${params.newSlotTime}.`,
     });
 
     return { success: true };

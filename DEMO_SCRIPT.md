@@ -1,137 +1,176 @@
-# 🎓 MediQueue — 5-to-7 Minute Professor Demonstration Script
+# 🎓 MediQueue AI — Professor Demonstration Script
 
-> **Purpose**: A structured, step-by-step walkthrough to present MediQueue's architecture, role-based workflows, AI assistant, appointment confirmation engine, and cyber-forensics audit trail to your professor.
-
----
-
-## ⏱️ Presentation Outline (Total: ~6.5 Minutes)
-
-| Phase | Time | Topic | Key Screencast / Action |
-| :--- | :---: | :--- | :--- |
-| **1. Intro & Architecture** | 1.0 min | Project Scope, Architecture & Demo Mode | Terminal launch, zero-cred mode, persistent badge |
-| **2. Patient & AI Assistant** | 2.0 min | MediQueue AI, Slot Search & Confirmation | Prompt query, Section 4 review card, atomic booking |
-| **3. Staff Operations** | 1.0 min | Ward Bed Management & Realtime Sync | Ward status transition, live bed occupancy update |
-| **4. Government Surveillance**| 0.5 min | Public Health Surge & Aggregate Isolation | Surge alert (>85%), aggregate-only enforcement |
-| **5. Cyber-Forensics** | 1.5 min | SHA-256 Hash Chain & Tamper Detection | Valid chain verification, adversary tamper trigger |
-| **6. RBAC Guard & Conclusion**| 0.5 min | 403 Security Guard & Academic Disclaimer | Unauthorized URL attempt, prototype limitations |
+> **Purpose**: A structured, step-by-step walkthrough to present MediQueue AI's clinical operations, 5 role-based portals, hybrid AI assistant with 11 tools, concurrency-safe appointment booking engine, and enterprise security logging to your university professor.
 
 ---
 
-## 🚀 Step 1: Launch & Show Demo Mode (0:00 - 1:00)
+## ⏱️ Demonstration Timeline (Total: ~6 to 8 Minutes)
 
-1. **Terminal Launch**:
+| Step | Persona / Role | Key Action | What It Proves |
+| :---: | :--- | :--- | :--- |
+| **1** | System Overview | Terminal launch & Demo Mode banner | Zero-credential local architecture & synthetic seeding |
+| **2** | **Patient** (Priya Sharma) | Ask MediQueue AI to find appointment | Natural language intent extraction & slot query |
+| **3** | **Patient** (Priya Sharma) | Review available slots | Real-time doctor & slot availability presentation |
+| **4** | **Patient** (Priya Sharma) | Confirm with explicit consent | Concurrency-safe reservation & 5-minute hold validation |
+| **5** | **Patient** (Priya Sharma) | Inspect confirmed booking | Persistent booking reference (`BK-...`) & OPD token |
+| **6** | **Staff** (Dr. Rajesh Kumar) | Log in as hospital doctor/staff | Role-based portal navigation & facility isolation |
+| **7** | **Staff** (Dr. Rajesh Kumar) | Update bed status (`available` $\to$ `cleaning`) | Real-time ward state transition & event logging |
+| **8** | **Staff** (Dr. Rajesh Kumar) | Inspect live dashboard & OPD queue | Real-time bed counter decrement & token queue desk |
+| **9** | **Hospital Admin** (Sunita Rao) | Review hospital executive dashboard | Census analytics, occupancy rates, and department metrics |
+| **10** | **Hospital Admin** (Sunita Rao) | Inspect department utilization & beds | Recharts data visualizations & ward inventory management |
+| **11** | **Government Officer** (Vikramaditya Sen) | District-level public health surveillance | Regional surge heatmaps (>85% alerts) & aggregate-only data |
+| **12** | **Super Admin** (Dev Anand) | Inspect enterprise security activity logs | HIPAA/Audit trail of all actions with actor, timestamp & scope |
+
+---
+
+## 🚀 Step-by-Step Guided Walkthrough
+
+### Step 1: Launch & Show Architecture (0:00 – 1:00)
+1. **Launch from Terminal**:
    ```bash
    npm run dev
    ```
 2. **Open Browser**: Navigate to `http://localhost:5173`.
-3. **What to Say to the Professor**:
-   > *"Professor, this is MediQueue, a cloud-native healthcare operations and digital forensics platform. It is designed to solve hospital overcrowding, opaque OPD wait times, and bed management delays.*
+3. **Point out the Interface**:
+   - Show the persistent **"DEMO MODE — SYNTHETIC DATA"** banner at the top of the header.
+   - Point out the **Persona Switcher** in the top navigation bar.
+4. **What to Say to the Professor**:
+   > *"Professor, this is MediQueue AI, an AI-powered real-time hospital resource management platform. It addresses four chronic challenges in healthcare delivery: uncoordinated outpatient queues, delayed inpatient bed turnaround, opaque doctor availability, and inter-hospital emergency turnaways.*
    >
-   > *Notice the persistent **'DEMO MODE — SYNTHETIC DATA'** badge in the header. The application runs 100% locally with zero cloud credentials required. All data across our 5 synthetic hospitals, 180 beds, and 55 patients is deterministically seeded and completely synthetic."*
+   > *Notice that MediQueue is running in dedicated Demonstration Mode with deterministic synthetic data across 5 representative hospitals, 180 beds, and 55 patients. No paid cloud credentials or external API keys are required for this local evaluation."*
 
 ---
 
-## 🤖 Step 2: Patient Portal & MediQueue AI Assistant (1:00 - 3:00)
-
-1. **Active Persona**: In the top-right **Persona Switcher**, ensure **Priya Sharma (Patient)** is active.
-2. **Navigate to AI Assistant**: Click **"AI Assistant"** in the sidebar (or navigate to `/patient/ai-assistant`).
-3. **Trigger Slot Search via AI**:
-   - In the suggested prompts bar, click the button: **`"Book Cardiologist for tomorrow"`**.
-   - Notice the AI calls the allowlisted backend tool `searchAppointmentSlots`.
-4. **Select an Available Slot**:
-   - The AI Assistant renders available slots for Cardiology at Metro Hospital.
-   - Click the green **"Prepare Booking Intent"** button on any morning slot (e.g., 09:30 AM).
-5. **Inspect the Confirmation Card (Section 4 Requirements)**:
-   - Point out the **Appointment Confirmation Card**:
-     - Doctor: Dr. Rajesh Kumar (Senior Consultant Cardiologist).
-     - Slot Time: Scheduled date & time with active **5-Minute Hold Countdown Timer**.
-     - Fee: ₹500 standard OPD fee.
-     - Consultation Type selector: Toggle between **In-Person** and **Teleconsultation**.
-     - Cancellation terms: Free cancellation up to 2 hours prior.
-     - **Mandatory Consent Checkbox**: *"I verify my details and explicitly authorize this appointment reservation."*
-6. **Demonstrate Guard**: Click "Confirm & Authorize Appointment" **without** ticking the consent box. Show the error: *"Consent required before committing booking."*
-7. **Authorize Booking**:
-   - Check the consent box and click **"Confirm & Authorize Appointment"**.
-   - The backend atomically validates the hold, checks idempotency, commits the record, assigns an authoritative Token (e.g., Token #15), and generates an immutable SHA-256 forensic audit hash.
-8. **View in Patient Appointments**:
-   - Click **"My Appointments"** in the sidebar. Show the new confirmed appointment with status **"scheduled"**.
-
----
-
-## 👨‍⚕️ Step 3: Staff Portal & Live Ward Bed Updates (3:00 - 4:00)
-
-1. **Switch Persona**: In the top-bar dropdown, switch to **Dr. Rajesh Kumar (Hospital Staff)**.
-2. **Notice Scope**: The navbar immediately updates to show Dr. Rajesh Kumar assigned to **Metro Hospital (hosp_metro_01)**.
-3. **Navigate to Ward Beds**: Click **"Ward Beds"** in the sidebar (`/staff/beds`).
-4. **Execute an Authorized Bed Status Update**:
-   - Locate an available bed (e.g., `ICU-01` or `GEN-04`).
-   - Change its status dropdown to **"cleaning"** or **"maintenance"**.
-   - The status updates immediately in reactive storage and logs a forensic audit record to the chain.
+### Step 2: Patient Portal — Ask MediQueue AI to Find an Appointment (1:00 – 2:00)
+1. In the top-right Persona Switcher, ensure **Priya Sharma (Patient)** is selected.
+2. In the left navigation sidebar, click **"AI Assistant"** (navigates to `/patient/ai-assistant`).
+3. Under **Suggested Prompts**, click the quick action button:
+   - **`"Book Cardiologist for tomorrow"`**
+4. Observe the AI execution:
+   - The hybrid assistant extracts the intent: `searchAppointmentSlots`.
+   - It targets department: `cardiology` and date: `tomorrow`.
+   - It displays real available morning and afternoon consultation slots with Dr. Rajesh Kumar.
 5. **What to Say to the Professor**:
-   > *"Hospital staff can only update beds within their assigned facility. The system validates hospital isolation before committing any state change."*
+   > *"MediQueue implements a hybrid conversational architecture. Natural language is parsed into structured parameters, validated against strict schemas, checked against the user's role authorization, and executed through an allowlisted backend tool. The LLM never writes directly to the database."*
 
 ---
 
-## 🏛️ Step 4: Government Surveillance & Aggregate Scope (4:00 - 4:30)
-
-1. **Switch Persona**: In the top-bar dropdown, switch to **Vikramaditya Sen (Government Officer)**.
-2. **Navigate to Surveillance**: Click **"Surveillance Map"** (`/government/dashboard`).
-3. **What to Say to the Professor**:
-   > *"Government officers monitor district-level healthcare capacity and surge alerts. Notice AIIMS is highlighted in critical red (>88% occupancy), triggering an automatic bed surge alert.*
-   >
-   > *Crucially, our RBAC model enforces that Government Officers have **aggregate-only access**. They have zero access to individual patient names, diagnostic orders, or medical records."*
-
----
-
-## 🔍 Step 5: Cyber-Forensics SHA-256 Hash Chain & Tamper Detection (4:30 - 6:00)
-
-1. **Switch Persona**: Switch to **Dev Anand (Super Admin)**.
-2. **Navigate to Audit Chain**: Click **"Forensics Audit Trail"** (`/superadmin/audit` or `/superadmin/dashboard`).
-3. **Explain Hash Chain Architecture**:
-   - Point to the **Genesis Block (Block #0)**: Anchored with index 0 and 64-char zero previous hash.
-   - Point to our recent appointment booking and bed update events in the chain.
-   - Each event contains `index`, `timestamp`, `eventType`, `actorUid`, `payloadHash`, `previousHash`, and `currentHash`.
-4. **Run Valid Integrity Verification**:
-   - Click the green **"Verify Chain Integrity"** button.
-   - Show the result: **"100% Chain Integrity Verified (X Blocks Valid)"**.
-5. **Demonstrate Adversarial Tamper Detection**:
-   - Scroll to the **"Adversarial Tamper Simulation (Demo Only)"** card.
-   - Click **"Simulate Adversary Modifying Block Details"**.
-   - Now click **"Verify Chain Integrity"** again.
-   - Show the result: **"INTEGRITY VIOLATION DETECTED at Block #X: Stored payloadHash does not match recomputed hash of stored details!"**
-   - Click **"Reset Chain to Valid Baseline"** to restore integrity.
-6. **What to Say to the Professor**:
-   > *"Professor, our forensic service uses standard RFC 6234 UTF-8 byte SHA-256 hashing. Rather than merely checking previous hash links, our verifier recomputes the payload hash from the stored database fields. If an adversary tampers with details in-place, deletes an event, or reorders records, the chain immediately breaks."*
+### Step 3: Review Available Consultation Slots (2:00 – 2:30)
+1. Look at the retrieved slot cards rendered directly in the AI Assistant chat.
+2. Point out:
+   - Doctor Name: **Dr. Rajesh Kumar** (Senior Consultant Cardiologist).
+   - Department: **Cardiology** at Metro General Hospital.
+   - Slot Time: Morning 09:30 AM – 10:00 AM.
+   - Room: Consultation Room 104.
+   - Consultation Fee: ₹500.
+3. Click the green **"Prepare Booking Intent"** button on the `09:30 AM` slot.
 
 ---
 
-## 🛡️ Step 6: RBAC 403 Security Guard & Wrap-Up (6:00 - 6:30)
-
-1. **Demonstrate 403 Unauthorized Guard**:
-   - Switch back to **Priya Sharma (Patient)**.
-   - Manually type `/superadmin/audit` or `/admin/dashboard` into the browser URL bar.
-   - Show that the `ProtectedRoute` component immediately catches the unauthorized role and renders the dedicated **"403 — Unauthorized Access"** page.
-2. **Show Automated Test Suite**:
-   - Switch back to the terminal and run:
-     ```bash
-     npm test
-     ```
-   - Show all **26 tests passing across 4 suites** (forensics, auth permissions, appointments, and demo behavior).
-3. **Closing Statement**:
-   > *"In summary, MediQueue demonstrates a robust academic prototype combining dual-persistence architecture, role-based access control, concurrency-safe appointment confirmation, an allowlisted AI assistant, and a verifiable cyber-forensics audit trail. All data is synthetic and ready for academic assessment."*
+### Step 4: Confirm the Appointment with Explicit Consent (2:30 – 3:30)
+1. Point to the **Appointment Confirmation Card** that appears:
+   - Shows doctor, specialty, facility, and appointment slot timestamp.
+   - Shows an active **5-Minute Temporary Reservation Timer**.
+   - Mode selector: Toggle between **In-Person Consultation** and **Teleconsultation**.
+   - Explicit Patient Consent Checkbox: *"I verify my details and explicitly authorize this appointment reservation."*
+2. **Demonstrate Validation**:
+   - Click **"Confirm & Authorize Appointment"** *without* checking the consent box.
+   - Point out the validation error: *"Consent required before committing booking."*
+3. **Authorize the Booking**:
+   - Check the consent box.
+   - Click **"Confirm & Authorize Appointment"**.
+4. **What to Say to the Professor**:
+   > *"Notice our clinical safety invariant: The AI can recommend and stage a booking, but only an explicit, authenticated user action can commit the reservation. In addition, our backend validates slot availability atomically immediately prior to committing, preventing concurrent double-booking."*
 
 ---
 
-## ❓ Probable Professor Questions & Recommended Answers
+### Step 5: Verify the Persisted Booking & Reference (3:30 – 4:00)
+1. Notice the confirmation message with the authoritative **Booking Reference ID** (e.g., `BK-A1B2C3D4`) and **Queue Token Number** (e.g., `Token #15`).
+2. Click **"My Appointments"** in the left sidebar (`/patient/appointments`).
+3. Show the newly booked appointment listed under **Upcoming Appointments** with status **"scheduled"**.
+4. Point out the options for **Reschedule** and **Cancel Appointment**.
 
-### Q1: *"Is the hash chain tamper-proof?"*
-> **Answer**: *"No hash chain is completely tamper-proof on a writeable medium. It is **tamper-evident**. If an adversary modifies any event payload, the stored hash and recomputed hash mismatch immediately. For true immutability in production, the chain tip would be periodically published to a write-once ledger or external timestamping service."*
+---
 
-### Q2: *"How does the appointment system prevent double-booking?"*
-> **Answer**: *"We use a two-phase reservation model. In phase one, the patient selects a slot and the backend places a 5-minute atomic hold in an `AWAITING_CONFIRMATION` state. In phase two, when the patient submits explicit consent with an idempotency key, the backend revalidates slot availability before committing the booking and generating the queue token."*
+### Step 6: Staff Portal — Log in as Hospital Doctor/Staff (4:00 – 4:30)
+1. In the top-bar Persona Switcher, switch to **Dr. Rajesh Kumar (Hospital Staff)**.
+2. Notice the navigation changes to the **Staff Portal**:
+   - Shows doctor credentials, designation (*Senior Consultant Cardiologist*), and hospital affiliation (*Metro General Hospital*).
+   - Hospital isolation is active: Dr. Kumar cannot access beds or queues of other hospitals.
 
-### Q3: *"Can the AI assistant order treatments or change medical records on its own?"*
-> **Answer**: *"No. The AI Assistant operates exclusively through 6 narrow, allowlisted backend tools. It does not perform autonomous diagnosis or emergency triage. Consequential actions such as booking or bed status updates require explicit user confirmation and backend authorization."*
+---
 
-### Q4: *"Can a user escalate their role by editing their browser session?"*
-> **Answer**: *"In our local demo mode, the persona switcher is strictly an educational simulation. In cloud mode with Firebase, our `firestore.rules` and `database.rules.json` explicitly reject any client write attempting to modify `role`, `hospitalId`, or `patientId`."*
+### Step 7: Update Ward Bed Status (4:30 – 5:15)
+1. In the sidebar, click **"Ward Beds"** (`/staff/beds`).
+2. Filter by ward: **ICU** or **General Ward**.
+3. Locate an **Available** bed (e.g., `ICU-02`).
+4. Click its status dropdown and transition it to **"cleaning"** (simulating a patient discharge turnover).
+5. Notice the bed card badge updates immediately from green (*Available*) to amber (*Cleaning*).
+
+---
+
+### Step 8: Inspect Live Staff Dashboard & OPD Queue (5:15 – 6:00)
+1. Click **"Dashboard"** in the sidebar (`/staff/dashboard`).
+2. Observe:
+   - Available Bed Counter has decremented in real-time.
+   - Cleaning Bed Counter has incremented.
+3. Click **"OPD Queue Desk"** (`/staff/opd-queue`).
+4. Show the live queue caller with:
+   - Current Token in Consultation.
+   - Waiting patient queue.
+   - Actions: **"Call Next Patient"**, **"Mark In-Consultation"**, **"Complete Consultation"**.
+
+---
+
+### Step 9: Hospital Admin Portal — Executive Overview (6:00 – 6:45)
+1. In the top-bar Persona Switcher, switch to **Sunita Rao (Hospital Admin)**.
+2. In the sidebar, click **"Dashboard"** (`/admin/dashboard`).
+3. Point out the executive KPI summary cards:
+   - Total Hospital Beds: 180.
+   - Occupied Beds & Occupancy Percentage (e.g., 78%).
+   - Currently Available Beds.
+   - Active OPD Queue Token Throughput.
+   - Today's Patient Admissions vs. Discharges.
+
+---
+
+### Step 10: Hospital Admin — Department Utilization & Capacity Analytics (6:45 – 7:15)
+1. In the sidebar, click **"Analytics"** (`/admin/analytics`).
+2. Demonstrate the interactive **Recharts** visualizations:
+   - Department-wise Bed Occupancy (Cardiology, Orthopedics, Pediatrics, Oncology).
+   - Daily Outpatient Flow vs. Staff Capacity.
+   - Average Consultation Wait Time by Department.
+3. Click **"Department Staffing"** (`/admin/departments`) to show clinical roster management.
+
+---
+
+### Step 11: Government Surveillance Portal — Regional Health Surveillance (7:15 – 7:45)
+1. In the top-bar Persona Switcher, switch to **Vikramaditya Sen (Government Officer)**.
+2. In the sidebar, click **"Surveillance Map"** (`/government/dashboard`).
+3. Point out:
+   - District-level hospital utilization across all 5 facilities in the jurisdiction.
+   - Facilities with >85% bed occupancy highlighted with an automatic **Public Health Surge Alert** badge.
+4. **Emphasize Privacy & HIPAA Compliance**:
+   > *"Notice that Government Officers have access strictly to aggregate statistical data. They have zero visibility into individual patient identities, clinical diagnoses, or billing records. This enforces least-privilege compliance by design."*
+
+---
+
+### Step 12: Super Admin Portal — Enterprise Security & Activity Audit Logs (7:45 – 8:15)
+1. In the top-bar Persona Switcher, switch to **Dev Anand (Super Admin)**.
+2. In the sidebar, click **"Security & Activity Logs"** (`/superadmin/logs`).
+3. Point out the live enterprise audit stream:
+   - Every appointment booking, bed status change, queue update, and login is recorded with:
+     - Exact Timestamp
+     - Actor User ID & Role
+     - Facility / Hospital Scope
+     - Event Category (`APPOINTMENT`, `BED_STATUS`, `OPD_QUEUE`, `AUTH`)
+     - Operational Severity (`INFO`, `WARN`, `SECURITY`)
+4. Point out the **Security Invariant**:
+   - All critical state transitions leave an auditable, queryable enterprise activity trail for operational transparency and governance.
+
+---
+
+## 💡 Quick Tips for the Presentation
+- **If the professor asks about the AI**: Emphasize that the assistant uses structured intent extraction with schema validation and role-based tool allowlisting, backed by a deterministic rule-based engine when cloud LLMs are unconfigured.
+- **If the professor asks about double-booking**: Point to the concurrency-safe revalidation step where slot availability is re-checked immediately before writing the booking to persistent storage.
+- **If the professor asks about security**: Show `firestore.rules` and explain that client-side role claims are never trusted for cloud authorization.

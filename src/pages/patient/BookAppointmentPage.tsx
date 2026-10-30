@@ -158,11 +158,11 @@ export const BookAppointmentPage: React.FC = () => {
               <span className="text-sm font-bold text-white">MediQueue Controlled AI Agent</span>
               <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-300 border border-sky-500/30 flex items-center gap-1">
                 <Sparkles className="h-3 w-3" />
-                Forensic Confirmation Card
+                Verified Confirmation Card
               </span>
             </div>
             <p className="mt-0.5 text-xs text-slate-300 leading-relaxed">
-              Prefer conversational booking? The AI prepares and revalidates your appointment with explicit confirmation, duplicate prevention, and SHA-256 audit logging.
+              Prefer conversational booking? The AI assistant searches real schedules, prepares booking summaries, and enforces explicit authorization with duplicate prevention.
             </p>
           </div>
         </div>
