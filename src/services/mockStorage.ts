@@ -1,4 +1,52 @@
-// High-fidelity Local Reactive Storage Engine with Cross-Tab Broadcast Synchronization
+const memoryStore = new Map<string, string>();
+
+const safeStorage = {
+  getItem: (key: string): string | null => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        return localStorage.getItem(key);
+      } catch {
+        return memoryStore.get(key) || null;
+      }
+    }
+    return memoryStore.get(key) || null;
+  },
+  setItem: (key: string, value: string): void => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(key, value);
+      } catch {
+        // Fallback
+      }
+    }
+    memoryStore.set(key, value);
+  },
+  removeItem: (key: string): void => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // Fallback
+      }
+    }
+    memoryStore.delete(key);
+  },
+  getKeys: (): string[] => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const keys: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k) keys.push(k);
+        }
+        return keys;
+      } catch {
+        return Array.from(memoryStore.keys());
+      }
+    }
+    return Array.from(memoryStore.keys());
+  }
+};
 
 type ListenerCallback<T> = (data: T) => void;
 
@@ -40,7 +88,7 @@ class MockStorageEngine {
 
   public getCollection<T>(col: string): T[] {
     try {
-      const raw = localStorage.getItem(this.getCollectionKey(col));
+      const raw = safeStorage.getItem(this.getCollectionKey(col));
       return raw ? JSON.parse(raw) : [];
     } catch {
       return [];
@@ -48,24 +96,42 @@ class MockStorageEngine {
   }
 
   public setCollection<T>(col: string, items: T[]) {
-    localStorage.setItem(this.getCollectionKey(col), JSON.stringify(items));
+    safeStorage.setItem(this.getCollectionKey(col), JSON.stringify(items));
     this.notifyCollection(col);
     this.broadcast({ type: 'COLLECTION_CHANGED', target: col });
   }
 
-  public getDocument<T>(col: string, docId: string, idKey: string = 'id'): T | null {
-    const items = this.getCollection<any>(col);
-    return items.find(item => (item[idKey] || item.uid || item.patientId || item.hospitalId || item.bedId || item.visitId || item.appointmentId || item.orderId || item.reportId || item.billId) === docId) || null;
+  private matchesDoc(item: any, docId: string, idKey?: string): boolean {
+    if (!item) return false;
+    if (idKey && item[idKey] === docId) return true;
+    return (
+      item.id === docId ||
+      item.appointmentId === docId ||
+      item.uid === docId ||
+      item.patientId === docId ||
+      item.hospitalId === docId ||
+      item.bedId === docId ||
+      item.departmentId === docId ||
+      item.staffId === docId ||
+      item.visitId === docId ||
+      item.orderId === docId ||
+      item.reportId === docId ||
+      item.billId === docId
+    );
   }
 
-  public setDocument<T extends Record<string, any>>(col: string, docId: string, data: T, idKey: string = 'id'): T {
+  public getDocument<T>(col: string, docId: string, idKey?: string): T | null {
     const items = this.getCollection<any>(col);
-    const key = idKey || (data.uid ? 'uid' : data.patientId ? 'patientId' : data.hospitalId ? 'hospitalId' : data.bedId ? 'bedId' : 'id');
-    const index = items.findIndex(item => (item[key] || item.id) === docId);
+    return items.find(item => this.matchesDoc(item, docId, idKey)) || null;
+  }
 
-    const docToSave = { ...data, [key]: docId };
+  public setDocument<T extends Record<string, any>>(col: string, docId: string, data: T, idKey?: string): T {
+    const items = this.getCollection<any>(col);
+    const index = items.findIndex(item => this.matchesDoc(item, docId, idKey));
+
+    const docToSave = { ...data, id: (data as any).id || docId };
     if (index >= 0) {
-      items[index] = docToSave;
+      items[index] = { ...items[index], ...docToSave };
     } else {
       items.push(docToSave);
     }
@@ -77,10 +143,7 @@ class MockStorageEngine {
 
   public updateDocument<T extends Record<string, any>>(col: string, docId: string, updates: Partial<T>, idKey?: string): T | null {
     const items = this.getCollection<any>(col);
-    const index = items.findIndex(item => {
-      const k = idKey || (item.uid ? 'uid' : item.patientId ? 'patientId' : item.hospitalId ? 'hospitalId' : item.bedId ? 'bedId' : 'id');
-      return (item[k] || item.id) === docId;
-    });
+    const index = items.findIndex(item => this.matchesDoc(item, docId, idKey));
 
     if (index === -1) return null;
     const updated = { ...items[index], ...updates };
@@ -139,7 +202,7 @@ class MockStorageEngine {
 
   public getRTDB<T>(path: string): T | null {
     try {
-      const raw = localStorage.getItem(this.getRTDBKey(path));
+      const raw = safeStorage.getItem(this.getRTDBKey(path));
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
@@ -147,7 +210,7 @@ class MockStorageEngine {
   }
 
   public setRTDB<T>(path: string, value: T) {
-    localStorage.setItem(this.getRTDBKey(path), JSON.stringify(value));
+    safeStorage.setItem(this.getRTDBKey(path), JSON.stringify(value));
     this.notifyRTDB(path, value);
     this.broadcast({ type: 'RTDB_CHANGED', target: path, data: value });
   }
@@ -187,14 +250,9 @@ class MockStorageEngine {
 
   // Clear or reset local mock store
   public clearAll() {
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && (k.startsWith('mq_col_') || k.startsWith('mq_rtdb_'))) {
-        keysToRemove.push(k);
-      }
-    }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
+    const keys = safeStorage.getKeys();
+    const keysToRemove = keys.filter(k => k.startsWith('mq_col_') || k.startsWith('mq_rtdb_'));
+    keysToRemove.forEach(k => safeStorage.removeItem(k));
   }
 }
 

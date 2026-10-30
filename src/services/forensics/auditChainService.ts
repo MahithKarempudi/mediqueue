@@ -1,28 +1,18 @@
-// Cyber-Forensics Immutable SHA-256 Hash Chain Service for MediQueue
+// Cyber-Forensics Tamper-Evident SHA-256 Hash Chain Service for MediQueue
+// Implements canonical UTF-8 byte serialization, sequential block verification,
+// and payload integrity recomputation to detect any in-place tampering, deletion, or reordering.
 
 import type { ForensicAuditEvent, ForensicEventType, ChainVerificationResult } from '@/types/appointmentWorkflow';
 import type { UserRole } from '@/types';
 import { mockStorage } from '../mockStorage';
 
 const STORAGE_KEY = 'mediqueue_forensic_chain';
-const GENESIS_PREV_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
+export const GENESIS_PREV_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
 
-// Pure JavaScript SHA-256 implementation ensuring instant synchronous cryptographic hashing
-function sha256Sync(ascii: string): string {
-  function rightRotate(value: number, amount: number) {
-    return (value >>> amount) | (value << (32 - amount));
-  }
-
-  let i = 0;
-  let j = 0;
-  let result = '';
-  const words: number[] = [];
-  const asciiBitLength = ascii.length * 8;
-
-  let hash = [
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
-  ];
+// Standard RFC 6234 compliant SHA-256 implementation operating on UTF-8 bytes
+export function sha256Sync(str: string): string {
+  const bytes = new TextEncoder().encode(str);
+  function rightRotate(v: number, n: number) { return (v >>> n) | (v << (32 - n)); }
 
   const k = [
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -35,34 +25,40 @@ function sha256Sync(ascii: string): string {
     0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
   ];
 
-  for (i = 0; i < ascii.length; i++) {
-    const code = ascii.charCodeAt(i);
-    words[i >> 2] |= (code & 0xff) << (24 - (i % 4) * 8);
-  }
+  let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a;
+  let h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
 
-  words[asciiBitLength >> 5] |= 0x80 << (24 - (asciiBitLength % 32));
-  words[(((asciiBitLength + 64) >> 9) << 4) + 15] = asciiBitLength;
+  const bitLength = bytes.length * 8;
+  const newLength = ((bytes.length + 8 + 64) >> 6) << 6;
+  const padded = new Uint8Array(newLength);
+  padded.set(bytes);
+  padded[bytes.length] = 0x80;
 
-  for (i = 0; i < words.length; i += 16) {
-    const w = words.slice(i, i + 16);
-    let a = hash[0], b = hash[1], c = hash[2], d = hash[3];
-    let e = hash[4], f = hash[5], g = hash[6], h = hash[7];
+  const view = new DataView(padded.buffer);
+  view.setBigUint64(newLength - 8, BigInt(bitLength), false);
 
-    for (j = 0; j < 64; j++) {
-      if (j < 16) {
-        // already in w
-      } else {
-        const gamma0 = rightRotate(w[j - 15], 7) ^ rightRotate(w[j - 15], 18) ^ (w[j - 15] >>> 3);
-        const gamma1 = rightRotate(w[j - 2], 17) ^ rightRotate(w[j - 2], 19) ^ (w[j - 2] >>> 10);
-        w[j] = (w[j - 16] + gamma0 + w[j - 7] + gamma1) | 0;
-      }
+  const words = new Uint32Array(padded.buffer);
+  const w = new Uint32Array(64);
 
-      const s1 = rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25);
+  for (let i = 0; i < words.length; i += 16) {
+    for (let t = 0; t < 16; t++) {
+      w[t] = view.getUint32((i + t) * 4, false);
+    }
+    for (let t = 16; t < 64; t++) {
+      const s0 = rightRotate(w[t - 15], 7) ^ rightRotate(w[t - 15], 18) ^ (w[t - 15] >>> 3);
+      const s1 = rightRotate(w[t - 2], 17) ^ rightRotate(w[t - 2], 19) ^ (w[t - 2] >>> 10);
+      w[t] = (w[t - 16] + s0 + w[t - 7] + s1) | 0;
+    }
+
+    let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+
+    for (let t = 0; t < 64; t++) {
+      const S1 = rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25);
       const ch = (e & f) ^ (~e & g);
-      const temp1 = (h + s1 + ch + k[j] + w[j]) | 0;
-      const s0 = rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22);
+      const temp1 = (h + S1 + ch + k[t] + w[t]) | 0;
+      const S0 = rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22);
       const maj = (a & b) ^ (a & c) ^ (b & c);
-      const temp2 = (s0 + maj) | 0;
+      const temp2 = (S0 + maj) | 0;
 
       h = g;
       g = f;
@@ -74,28 +70,48 @@ function sha256Sync(ascii: string): string {
       a = (temp1 + temp2) | 0;
     }
 
-    hash[0] = (hash[0] + a) | 0;
-    hash[1] = (hash[1] + b) | 0;
-    hash[2] = (hash[2] + c) | 0;
-    hash[3] = (hash[3] + d) | 0;
-    hash[4] = (hash[4] + e) | 0;
-    hash[5] = (hash[5] + f) | 0;
-    hash[6] = (hash[6] + g) | 0;
-    hash[7] = (hash[7] + h) | 0;
+    h0 = (h0 + a) | 0;
+    h1 = (h1 + b) | 0;
+    h2 = (h2 + c) | 0;
+    h3 = (h3 + d) | 0;
+    h4 = (h4 + e) | 0;
+    h5 = (h5 + f) | 0;
+    h6 = (h6 + g) | 0;
+    h7 = (h7 + h) | 0;
   }
 
-  for (i = 0; i < 8; i++) {
-    for (j = 3; j >= 0; j--) {
-      const byte = (hash[i] >> (j * 8)) & 255;
-      result += (byte < 16 ? '0' : '') + byte.toString(16);
-    }
-  }
+  const out = new DataView(new ArrayBuffer(32));
+  out.setUint32(0, h0, false);
+  out.setUint32(4, h1, false);
+  out.setUint32(8, h2, false);
+  out.setUint32(12, h3, false);
+  out.setUint32(16, h4, false);
+  out.setUint32(20, h5, false);
+  out.setUint32(24, h6, false);
+  out.setUint32(28, h7, false);
 
-  return result;
+  return Array.from(new Uint8Array(out.buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 export const computeHash = (dataString: string): string => {
   return sha256Sync(dataString);
+};
+
+// Canonical payload serialization ensuring deterministic hashing
+export const serializePayload = (params: {
+  details: string;
+  targetPatientId?: string | null;
+  hospitalId?: string | null;
+  requestId?: string | null;
+  appointmentId?: string | null;
+}): string => {
+  return JSON.stringify({
+    details: params.details,
+    targetPatientId: params.targetPatientId || null,
+    hospitalId: params.hospitalId || null,
+    requestId: params.requestId || null,
+    appointmentId: params.appointmentId || null,
+  });
 };
 
 export const computeEventHash = (
@@ -110,11 +126,46 @@ export const computeEventHash = (
   return sha256Sync(serialized);
 };
 
+let memoryChainCache: string | null = null;
+
+function getStoredChainRaw(): string | null {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem(STORAGE_KEY);
+    }
+  } catch (e) {
+    // ignore
+  }
+  return memoryChainCache;
+}
+
+function setStoredChainRaw(val: string): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, val);
+    }
+  } catch (e) {
+    // ignore
+  }
+  memoryChainCache = val;
+}
+
+function removeStoredChainRaw(): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  } catch (e) {
+    // ignore
+  }
+  memoryChainCache = null;
+}
+
 export const auditChainService = {
   // Retrieve chain from local storage or initialize with Genesis block
   getChain(): ForensicAuditEvent[] {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = getStoredChainRaw();
       if (raw) {
         return JSON.parse(raw);
       }
@@ -122,15 +173,16 @@ export const auditChainService = {
       console.warn('Failed to parse forensic chain:', e);
     }
 
-    // Initialize with immutable Genesis block
     const genesisTimestamp = '2026-09-17T09:00:00.000Z';
-    const payload = JSON.stringify({
-      system: 'MediQueue Cloud Healthcare Platform',
-      version: 'v1.0-forensics-audit',
-      genesisNote: 'Tamper-Evident Cyber-Forensics SHA-256 Hash Chain Initialized',
+    const payload = serializePayload({
+      details: 'Genesis Cryptographic Anchor Block Established with SHA-256 Tamper-Evident Hash Chain.',
+      targetPatientId: null,
+      hospitalId: null,
+      requestId: null,
+      appointmentId: null,
     });
     const payloadHash = computeHash(payload);
-    const genesisHash = computeEventHash(0, genesisTimestamp, 'GENESIS_CHAIN_INIT', 'system_root', payloadHash, GENESIS_PREV_HASH);
+    const genesisHash = computeEventHash(0, genesisTimestamp, 'BOOKING_REQUESTED', 'system_root', payloadHash, GENESIS_PREV_HASH);
 
     const genesisEvent: ForensicAuditEvent = {
       index: 0,
@@ -143,18 +195,18 @@ export const auditChainService = {
         role: 'super_admin' as UserRole,
         name: 'MediQueue Cyber-Security Kernel',
       },
-      details: 'Genesis Cryptographic Anchor Block Established with SHA-256 Hash Chain verification.',
+      details: 'Genesis Cryptographic Anchor Block Established with SHA-256 Tamper-Evident Hash Chain.',
       payloadHash,
       previousHash: GENESIS_PREV_HASH,
       currentHash: genesisHash,
     };
 
     const initial = [genesisEvent];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+    setStoredChainRaw(JSON.stringify(initial));
     return initial;
   },
 
-  // Append new event to the SHA-256 hash chain
+  // Append new event to the SHA-256 hash chain (Append-only)
   appendEvent(params: {
     eventType: ForensicEventType;
     severity?: 'INFO' | 'WARN' | 'CRITICAL';
@@ -164,7 +216,6 @@ export const auditChainService = {
     requestId?: string;
     appointmentId?: string;
     details: string;
-    metadata?: Record<string, any>;
   }): ForensicAuditEvent {
     const chain = this.getChain();
     const lastEvent = chain[chain.length - 1];
@@ -173,14 +224,13 @@ export const auditChainService = {
     const timestamp = new Date().toISOString();
     const id = `forensic_evt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
-    // Minimize logged payload data (no passwords, raw conversational text, or sensitive tokens)
-    const sanitizedPayload = JSON.stringify({
+    // Minimize logged payload data: Never store passwords, tokens, or raw medical transcripts
+    const sanitizedPayload = serializePayload({
       details: params.details,
       targetPatientId: params.targetPatientId || null,
       hospitalId: params.hospitalId || null,
       requestId: params.requestId || null,
       appointmentId: params.appointmentId || null,
-      ...(params.metadata || {}),
     });
 
     const payloadHash = computeHash(sanitizedPayload);
@@ -212,7 +262,7 @@ export const auditChainService = {
     };
 
     chain.push(newEvent);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(chain));
+    setStoredChainRaw(JSON.stringify(chain));
 
     // Also mirror to mockStorage collection so Super Admin and Audit pages see it live
     mockStorage.setDocument('forensic_audit_events', id, newEvent);
@@ -220,9 +270,10 @@ export const auditChainService = {
     return newEvent;
   },
 
-  // Cryptographically verifies every link in the hash chain from Genesis to tip
-  verifyChainIntegrity(): ChainVerificationResult {
-    const chain = this.getChain();
+  // Cryptographically verifies every link in the hash chain from Genesis to tip.
+  // Recomputes payload hash from actual stored fields and verifies sequential indexing.
+  verifyChainIntegrity(customChain?: ForensicAuditEvent[]): ChainVerificationResult {
+    const chain = customChain || this.getChain();
 
     if (chain.length === 0) {
       return {
@@ -233,7 +284,18 @@ export const auditChainService = {
       };
     }
 
-    // Verify Genesis block
+    // 1. Verify Genesis block indexing & anchor
+    if (chain[0].index !== 0) {
+      return {
+        isValid: false,
+        totalBlocks: chain.length,
+        brokenIndex: 0,
+        brokenEventId: chain[0].id,
+        error: `Genesis block index invalid: Expected 0, found ${chain[0].index}. Chain sequence compromised.`,
+        verifiedAt: new Date().toISOString(),
+      };
+    }
+
     if (chain[0].previousHash !== GENESIS_PREV_HASH) {
       return {
         isValid: false,
@@ -245,25 +307,60 @@ export const auditChainService = {
       };
     }
 
-    // Traverse every block
-    for (let i = 1; i < chain.length; i++) {
-      const prev = chain[i - 1];
+    // 2. Traverse every block in sequence
+    for (let i = 0; i < chain.length; i++) {
       const curr = chain[i];
 
-      // 1. Check parent linkage
-      if (curr.previousHash !== prev.currentHash) {
+      // A. Check sequential index continuity (detects deletion, insertion, or reordering)
+      if (curr.index !== i) {
         return {
           isValid: false,
           totalBlocks: chain.length,
           brokenIndex: i,
           brokenEventId: curr.id,
-          error: `Broken hash link at block #${i}. Block previousHash does not match parent currentHash.`,
+          error: `Sequence discontinuity detected at block #${i}. Stored index #${curr.index} does not match expected position #${i} (event deletion, insertion, or reordering).`,
           verifiedAt: new Date().toISOString(),
         };
       }
 
-      // 2. Recompute current hash to detect in-place data tampering
-      const recomputedHash = computeEventHash(
+      // B. Verify parent hash link for blocks > 0
+      if (i > 0) {
+        const prev = chain[i - 1];
+        if (curr.previousHash !== prev.currentHash) {
+          return {
+            isValid: false,
+            totalBlocks: chain.length,
+            brokenIndex: i,
+            brokenEventId: curr.id,
+            error: `Broken hash link at block #${i}. Block previousHash does not match parent block #${i - 1} currentHash.`,
+            verifiedAt: new Date().toISOString(),
+          };
+        }
+      }
+
+      // C. Recompute payload hash from actual stored event fields (detects in-place payload alteration)
+      const expectedPayload = serializePayload({
+        details: curr.details,
+        targetPatientId: curr.targetPatientId || null,
+        hospitalId: curr.hospitalId || null,
+        requestId: curr.requestId || null,
+        appointmentId: curr.appointmentId || null,
+      });
+      const recomputedPayloadHash = computeHash(expectedPayload);
+
+      if (recomputedPayloadHash !== curr.payloadHash) {
+        return {
+          isValid: false,
+          totalBlocks: chain.length,
+          brokenIndex: i,
+          brokenEventId: curr.id,
+          error: `Payload tamper detected at block #${i}. Stored payloadHash [${curr.payloadHash.substring(0, 8)}...] does not match recomputed hash of details [${recomputedPayloadHash.substring(0, 8)}...].`,
+          verifiedAt: new Date().toISOString(),
+        };
+      }
+
+      // D. Recompute event hash (detects timestamp, actor, index, or eventType alteration)
+      const recomputedEventHash = computeEventHash(
         curr.index,
         curr.timestamp,
         curr.eventType,
@@ -272,13 +369,13 @@ export const auditChainService = {
         curr.previousHash
       );
 
-      if (recomputedHash !== curr.currentHash) {
+      if (recomputedEventHash !== curr.currentHash) {
         return {
           isValid: false,
           totalBlocks: chain.length,
           brokenIndex: i,
           brokenEventId: curr.id,
-          error: `Cryptographic tamper detected at block #${i}. Stored hash [${curr.currentHash.substring(0, 8)}...] differs from computed hash [${recomputedHash.substring(0, 8)}...].`,
+          error: `Cryptographic tamper detected at block #${i}. Stored event hash [${curr.currentHash.substring(0, 8)}...] differs from computed hash [${recomputedEventHash.substring(0, 8)}...].`,
           verifiedAt: new Date().toISOString(),
         };
       }
@@ -291,19 +388,19 @@ export const auditChainService = {
     };
   },
 
-  // Professor demonstration helper: Simulates an adversary modifying an audit record to show intrusion detection
+  // Demonstration test trigger: Simulates an adversary modifying an audit record to demonstrate tamper detection
   simulateTamper(index: number, maliciousDetails: string): void {
     const chain = this.getChain();
     if (index >= 0 && index < chain.length) {
       chain[index].details = maliciousDetails;
       chain[index].tampered = true;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(chain));
+      setStoredChainRaw(JSON.stringify(chain));
     }
   },
 
-  // Reset chain back to valid state
+  // Reset chain back to valid initial genesis state (labelled for demo only)
   resetChain(): void {
-    localStorage.removeItem(STORAGE_KEY);
+    removeStoredChainRaw();
     this.getChain();
   },
 };

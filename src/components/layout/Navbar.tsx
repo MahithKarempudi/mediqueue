@@ -71,22 +71,28 @@ export const Navbar: React.FC = () => {
 
         {/* Real-time Sync Status & Quick Persona Switcher */}
         <div className="flex items-center gap-3">
+          {/* Persistent Environment Mode Badge (Phase 2 Requirement) */}
+          <div className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border transition shadow-sm select-none bg-amber-950/50 text-amber-300 border-amber-500/40">
+            <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+            <span>{isFirebaseConfigured ? 'CLOUD MODE — FIREBASE AUTH' : 'DEMO MODE — SYNTHETIC DATA'}</span>
+          </div>
+
           {/* Live Sync Badge */}
-          <div className="hidden md:flex items-center gap-2 rounded-full bg-emerald-950/60 px-3 py-1 text-xs font-medium text-emerald-300 border border-emerald-800/60">
+          <div className="hidden lg:flex items-center gap-2 rounded-full bg-emerald-950/60 px-3 py-1 text-xs font-medium text-emerald-300 border border-emerald-800/60">
             <Radio className="h-3 w-3 animate-ping text-emerald-400" />
             <span>{isFirebaseConfigured ? 'Firebase Live Sync' : 'Multi-Tab Broadcast Sync'}</span>
           </div>
 
-          {/* Quick Demo Role Switcher */}
+          {/* Quick Demo Role Switcher (Simulation Only) */}
           <div className="relative">
             <button
               id="role-switcher-btn"
               onClick={() => setSwitcherOpen(!switcherOpen)}
               className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-xs font-medium text-slate-200 shadow-sm transition hover:border-mediblue-500/50 hover:bg-slate-800"
-              title="Click to quickly switch demo roles"
+              title="Demo Persona Switcher (Simulation Only)"
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-              <span className="hidden sm:inline text-slate-400">Role:</span>
+              <span className="hidden sm:inline text-slate-400">Simulation Role:</span>
               <span className="font-semibold capitalize text-white">
                 {user ? DEMO_PERSONAS[user.role].label : 'Select Role'}
               </span>
@@ -96,15 +102,20 @@ export const Navbar: React.FC = () => {
             {/* Dropdown Menu */}
             {switcherOpen && (
               <div
-                className="absolute right-0 mt-2 w-72 origin-top-right rounded-xl border border-slate-700/80 bg-slate-900 p-2 shadow-2xl backdrop-blur-xl ring-1 ring-black/50 z-50 animate-fade-in"
+                className="absolute right-0 mt-2 w-80 origin-top-right rounded-xl border border-slate-700/80 bg-slate-900 p-2 shadow-2xl backdrop-blur-xl ring-1 ring-black/50 z-50 animate-fade-in"
                 onMouseLeave={() => setSwitcherOpen(false)}
               >
                 <div className="px-2 py-1.5 border-b border-slate-800">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                    Switch Test Persona
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    Instant cross-role simulation without re-login
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
+                      Persona Switcher (Simulation Only)
+                    </p>
+                    <span className="text-[9px] bg-amber-500/10 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/20">
+                      Academic Demo
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">
+                    Simulates RBAC persona boundaries without requiring live multi-account credentials.
                   </p>
                 </div>
                 <div className="mt-1 space-y-1">

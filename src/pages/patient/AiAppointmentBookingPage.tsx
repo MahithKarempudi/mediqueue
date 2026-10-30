@@ -1,9 +1,11 @@
-// MediQueue AI: Controlled Appointment Confirmation Workflow & Forensics Console
-// Design Principle: The AI may search, prepare and recommend,
-// but only the authenticated backend can authorize and commit the booking.
+// MediQueue AI Assistant — Ask, Find & Act
+// Controlled AI Agent Console & Forensics Proving Grounds
+// Supports all 5 Stakeholder Roles with Allowlisted Backend Tools,
+// Strict RBAC, Explicit Confirmation, and RFC-Compliant SHA-256 Forensics.
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { aiAssistantService, type AiToolResult } from '@/services/ai/aiAssistantService';
 import { aiAppointmentBackend } from '@/services/appointments/aiAppointmentBackend';
 import { auditChainService } from '@/services/forensics/auditChainService';
 import { AppointmentConfirmationCard } from '@/components/appointments/AppointmentConfirmationCard';
@@ -16,6 +18,7 @@ import type {
   ForensicAuditEvent,
   ChainVerificationResult,
 } from '@/types/appointmentWorkflow';
+import type { IpdBed, OpdAppointment, UserRole } from '@/types';
 import {
   Bot,
   User as UserIcon,
@@ -23,18 +26,14 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertTriangle,
-  Clock,
-  ArrowRight,
   Terminal,
   RefreshCw,
   Hash,
   Lock,
+  Bed,
+  BarChart3,
   Calendar,
   Sparkles,
-  Search,
-  FileCheck2,
-  AlertCircle,
-  Copy,
 } from 'lucide-react';
 
 interface ChatMessage {
@@ -45,6 +44,9 @@ interface ChatMessage {
   intent?: BookingIntent;
   confirmedResult?: ConfirmedBookingResult;
   slots?: AppointmentSlot[];
+  beds?: IpdBed[];
+  appointments?: OpdAppointment[];
+  operationalSummary?: Record<string, any>;
   stateBadge?: AppointmentWorkflowState;
 }
 
@@ -57,14 +59,52 @@ export const AiAppointmentBookingPage: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Forensics panel state
+  // Forensics state
   const [recentAuditEvents, setRecentAuditEvents] = useState<ForensicAuditEvent[]>([]);
   const [verificationResult, setVerificationResult] = useState<ChainVerificationResult | null>(null);
   const [activeTab, setActiveTab] = useState<'chat' | 'forensics' | 'testSuite'>('chat');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Load initial welcome message and audit chain
+  // Suggested Prompts based on Active Demo Persona
+  const getSuggestedPrompts = (role: UserRole = 'patient'): string[] => {
+    switch (role) {
+      case 'staff':
+        return [
+          'Check authorized hospital bed availability',
+          'Show hospital operational summary',
+          'Update bed status to OCCUPIED',
+          'Search cardiology appointment slots',
+        ];
+      case 'hospital_admin':
+        return [
+          'Show hospital operational summary',
+          'Check authorized hospital bed availability',
+          'Show my hospital appointments',
+          'Search cardiology appointment slots',
+        ];
+      case 'government_officer':
+        return [
+          'Show hospital operational summary',
+          'Check authorized hospital bed availability',
+        ];
+      case 'super_admin':
+        return [
+          'Show hospital operational summary',
+          'Check authorized hospital bed availability',
+          'Show my hospital appointments',
+        ];
+      case 'patient':
+      default:
+        return [
+          'Book a cardiologist for tomorrow',
+          'Show my existing appointments',
+          'Find orthopedic slots',
+          'Book an emergency teleconsultation',
+        ];
+    }
+  };
+
   useEffect(() => {
     const initialChain = auditChainService.getChain();
     setRecentAuditEvents(initialChain.slice(-5).reverse());
@@ -73,9 +113,11 @@ export const AiAppointmentBookingPage: React.FC = () => {
     const welcomeMsg: ChatMessage = {
       id: 'msg_welcome',
       sender: 'ai',
-      text: `Hello ${user?.name || 'Patient'}! I am the MediQueue Controlled Appointment Agent. I can help search valid hospital schedules, prepare booking summaries, and track your visits. 
+      text: `Hello ${user?.name || 'User'} (${user ? user.role.replace('_', ' ').toUpperCase() : 'DEMO'})! Welcome to MediQueue AI Assistant — Ask, Find & Act.
 
-Notice: In accordance with MediQueue security policy, I can search and prepare appointments, but only the authenticated backend can authorize and commit bookings upon your explicit review.`,
+I am your role-governed healthcare assistant. I can search valid hospital schedules, prepare booking summaries, check authorized bed censuses, and retrieve operational summaries.
+
+Notice: Only the authenticated backend can authorize and commit bookings or status changes upon your explicit review.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       stateBadge: 'IDLE',
     };
@@ -93,10 +135,10 @@ Notice: In accordance with MediQueue security policy, I can search and prepare a
   };
 
   // -------------------------------------------------------------
-  // Workflow: Step 1-4 (Search Slots & Prepare Intent)
+  // Tool Execution & Message Dispatch
   // -------------------------------------------------------------
-  const handleUserSearch = async (userText: string) => {
-    if (!userText.trim() || isProcessing) return;
+  const handleUserMessage = async (userText: string) => {
+    if (!userText.trim() || isProcessing || !user) return;
 
     const userMsg: ChatMessage = {
       id: `msg_${Date.now()}`,
@@ -111,77 +153,16 @@ Notice: In accordance with MediQueue security policy, I can search and prepare a
     setErrorMessage(null);
     setCurrentState('SEARCHING');
 
-    // 1. Authenticate and Authorize
-    if (!user) {
+    // Run allowlisted tool orchestration
+    const result: AiToolResult = await aiAssistantService.processUserMessage(userText, user);
+
+    if (!result.success) {
       setMessages((prev) => [
         ...prev,
         {
           id: `msg_${Date.now()}`,
           sender: 'ai',
-          text: 'Security Alert: You must be authenticated to search or prepare appointments.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          stateBadge: 'FAILED',
-        },
-      ]);
-      setIsProcessing(false);
-      setCurrentState('FAILED');
-      return;
-    }
-
-    // 2. Determine specialty/intent from prompt
-    let specialty = 'Cardiology';
-    if (userText.toLowerCase().includes('ortho')) specialty = 'Orthopedics';
-    if (userText.toLowerCase().includes('pediatric') || userText.toLowerCase().includes('child')) specialty = 'Pediatrics';
-    if (userText.toLowerCase().includes('general') || userText.toLowerCase().includes('physician')) specialty = 'General Medicine';
-
-    // 3. Query Backend for Real Available Slots
-    const { slots, error } = await aiAppointmentBackend.searchAppointmentSlots(
-      {
-        specialty,
-        hospitalId: user.hospitalId || 'hosp_metro_01',
-        date: '2026-10-24',
-      },
-      user
-    );
-
-    if (error || slots.length === 0) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `msg_${Date.now()}`,
-          sender: 'ai',
-          text: `Backend Search Notice: ${error || 'No open slots found for the requested criteria.'}`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          stateBadge: 'UNAVAILABLE',
-        },
-      ]);
-      setCurrentState('UNAVAILABLE');
-      setIsProcessing(false);
-      refreshAuditLogs();
-      return;
-    }
-
-    setCurrentState('AVAILABLE');
-    const targetSlot = slots.find((s) => s.time.includes('10:30') || s.available) || slots[0];
-
-    // 4. Create Booking Intent (Transitions to AWAITING_CONFIRMATION)
-    const { intent, error: intentError } = await aiAppointmentBackend.createBookingIntent(
-      {
-        slot: targetSlot,
-        patientId: user.patientId || 'pat_demo_01',
-        patientName: user.name || 'Priya Sharma',
-        consultationType: 'in_person',
-      },
-      user
-    );
-
-    if (intentError || !intent) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `msg_${Date.now()}`,
-          sender: 'ai',
-          text: `Authorization Error: ${intentError}`,
+          text: result.message,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           stateBadge: 'FAILED',
         },
@@ -192,21 +173,72 @@ Notice: In accordance with MediQueue security policy, I can search and prepare a
       return;
     }
 
-    // 5. Present the Appointment Summary & Confirmation Card
-    setActiveIntent(intent);
-    setCurrentState('AWAITING_CONFIRMATION');
+    // Handle Appointment Slot Search -> Prepares Booking Intent
+    if (result.toolName === 'searchAppointmentSlots' && result.slots && result.slots.length > 0) {
+      setCurrentState('AVAILABLE');
+      const targetSlot = result.slots.find((s) => s.available) || result.slots[0];
 
+      const { intent, error: intentError } = await aiAppointmentBackend.createBookingIntent(
+        {
+          slot: targetSlot,
+          patientId: user.patientId || 'pat_demo_01',
+          patientName: user.name || 'Priya Sharma',
+          consultationType: 'in_person',
+        },
+        user
+      );
+
+      if (intentError || !intent) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `msg_${Date.now()}`,
+            sender: 'ai',
+            text: `Authorization Notice: ${intentError}`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            stateBadge: 'FAILED',
+          },
+        ]);
+        setCurrentState('FAILED');
+        setIsProcessing(false);
+        refreshAuditLogs();
+        return;
+      }
+
+      setActiveIntent(intent);
+      setCurrentState('AWAITING_CONFIRMATION');
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `msg_${Date.now()}`,
+          sender: 'ai',
+          text: `I queried live availability at ${targetSlot.hospitalName} for ${targetSlot.specialty}. I prepared an appointment booking intent for ${targetSlot.date} at ${targetSlot.time} with ${targetSlot.doctorName}.
+
+Please review the details in the confirmation card below and click "Confirm booking" once authorized.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          stateBadge: 'AWAITING_CONFIRMATION',
+          intent,
+        },
+      ]);
+      setIsProcessing(false);
+      refreshAuditLogs();
+      return;
+    }
+
+    // Handle other tools (beds, operational summary, appointments)
+    setCurrentState('IDLE');
     setMessages((prev) => [
       ...prev,
       {
         id: `msg_${Date.now()}`,
-        sender: 'ai',
-        text: `I queried live availability at ${targetSlot.hospitalName} for ${targetSlot.specialty}. I have prepared an appointment booking intent for ${targetSlot.date} at ${targetSlot.time} with ${targetSlot.doctorName}. 
-
-Please review the details in the confirmation card below and select "Confirm booking" once authorized.`,
+        sender: 'backend',
+        text: result.message,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        stateBadge: 'AWAITING_CONFIRMATION',
-        intent,
+        beds: result.beds,
+        appointments: result.appointments,
+        operationalSummary: result.operationalSummary,
+        stateBadge: 'IDLE',
       },
     ]);
 
@@ -214,16 +246,13 @@ Please review the details in the confirmation card below and select "Confirm boo
     refreshAuditLogs();
   };
 
-  // -------------------------------------------------------------
-  // Workflow: Step 6-8 (Explicit Confirmation & Backend Commit)
-  // -------------------------------------------------------------
+  // Explicit Patient Confirmation & Commit
   const handleConfirmBooking = async (consultationType: ConsultationType, consentConfirmed: boolean) => {
     if (!activeIntent || !user) return;
 
     setIsProcessing(true);
     setErrorMessage(null);
 
-    // Call authoritative backend function
     const { result, error, state } = await aiAppointmentBackend.confirmAppointment(
       {
         intentId: activeIntent.intentId,
@@ -241,7 +270,6 @@ Please review the details in the confirmation card below and select "Confirm boo
       return;
     }
 
-    // Success: Backend authorized and committed booking
     setCurrentState('CONFIRMED');
     setActiveIntent(null);
 
@@ -282,15 +310,12 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
     refreshAuditLogs();
   };
 
-  // -------------------------------------------------------------
-  // Security & Forensic Threat Test Suite (Professor Demo Handlers)
-  // -------------------------------------------------------------
+  // Professor Testing Suite Triggers
   const handleTestUnauthorizedAccess = async () => {
     if (!user) return;
     setIsProcessing(true);
     setErrorMessage(null);
 
-    // Attempt to book with unauthorized target patient ID
     const slot: AppointmentSlot = {
       slotId: 'slot_unauth_01',
       hospitalId: 'hosp_metro_01',
@@ -306,10 +331,10 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
       fee: 500,
     };
 
-    const { intent, error } = await aiAppointmentBackend.createBookingIntent(
+    const { error } = await aiAppointmentBackend.createBookingIntent(
       {
         slot,
-        patientId: 'pat_unauthorized_victim_99', // Violates patient ownership
+        patientId: 'pat_unauthorized_victim_99',
         consultationType: 'in_person',
       },
       user
@@ -357,7 +382,6 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
     refreshAuditLogs();
   };
 
-  // State Badge Color Helper
   const getStateBadgeColor = (state: AppointmentWorkflowState) => {
     switch (state) {
       case 'CONFIRMED':
@@ -380,25 +404,27 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto animate-fade-in pb-12">
-      {/* Page Header */}
+      {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur-md">
         <div>
           <div className="flex items-center gap-2">
             <span className="rounded-full bg-sky-500/10 px-2.5 py-0.5 text-xs font-semibold text-sky-400 border border-sky-500/20 flex items-center gap-1.5">
               <Bot className="h-3.5 w-3.5" />
-              Controlled AI Booking Agent
+              MediQueue AI Assistant — Ask, Find & Act
             </span>
-            <span className="text-xs text-slate-400 font-mono">Backend Authoritative</span>
+            <span className="text-[11px] text-amber-300 font-mono bg-amber-950/40 px-2 py-0.5 rounded border border-amber-800/60">
+              Rule-Based Demo Mode
+            </span>
           </div>
           <h1 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            AI Appointment Workflow & Confirmation
+            Healthcare Operations & AI Assistant
           </h1>
           <p className="mt-1 text-xs text-slate-400 max-w-2xl leading-relaxed">
-            The AI searches, checks availability, and prepares booking intents. Only the authenticated backend can authorize and atomically commit appointments upon explicit patient confirmation.
+            Role-governed assistant executing allowlisted backend functions for slot searches, appointment booking intents, bed management, and operational summaries.
           </p>
         </div>
 
-        {/* State Machine Status Badge */}
+        {/* State Machine & Forensics Status Badges */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 text-right">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
@@ -409,10 +435,9 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
             </span>
           </div>
 
-          {/* Forensics Integrity Badge */}
           <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 text-right">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-              Forensic SHA-256 Chain
+              Tamper-Evident SHA-256 Chain
             </span>
             <span className={`inline-flex items-center gap-1 mt-1 rounded-md px-2.5 py-0.5 text-xs font-bold border ${
               verificationResult?.isValid
@@ -427,12 +452,20 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
               ) : (
                 <>
                   <AlertTriangle className="h-3 w-3" />
-                  <span>Tamper Detected!</span>
+                  <span>Tamper Flagged!</span>
                 </>
               )}
             </span>
           </div>
         </div>
+      </div>
+
+      {/* Mandatory Safety & Clinical Responsibility Notice */}
+      <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3.5 flex items-start gap-3">
+        <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+        <p className="text-xs text-amber-200/90 leading-relaxed">
+          <strong className="text-white font-semibold">Important Clinical & Academic Notice:</strong> AI-generated responses can make mistakes. Critical clinical decisions require qualified medical staff. This prototype operates in a deterministic rule-based demo mode using synthetic healthcare data and does not provide autonomous medical diagnosis or triage.
+        </p>
       </div>
 
       {/* Navigation Tabs */}
@@ -446,7 +479,7 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
           }`}
         >
           <Bot className="h-4 w-4" />
-          <span>Interactive Booking Agent</span>
+          <span>Interactive Assistant Console</span>
         </button>
 
         <button
@@ -458,7 +491,7 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
           }`}
         >
           <Hash className="h-4 w-4" />
-          <span>SHA-256 Forensics Hash Chain</span>
+          <span>Tamper-Evident Forensics Chain</span>
         </button>
 
         <button
@@ -470,17 +503,16 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
           }`}
         >
           <Terminal className="h-4 w-4 text-amber-400" />
-          <span>Professor Testing Suite (Section 7)</span>
+          <span>Professor Testing Proving Grounds</span>
         </button>
       </div>
 
-      {/* Main Content Area */}
+      {/* Tab 1: Chat Assistant Console */}
       {activeTab === 'chat' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column: Chat Conversation Thread (2 Cols) */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 sm:p-6 shadow-xl flex flex-col h-[620px]">
-              {/* Messages Container */}
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 sm:p-6 shadow-xl flex flex-col h-[640px]">
+              {/* Message List */}
               <div className="flex-1 overflow-y-auto space-y-4 pr-2">
                 {messages.map((m) => (
                   <div
@@ -504,7 +536,7 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
                     }`}>
                       <div className="flex items-center justify-between gap-3 text-[10px] text-slate-400">
                         <span className="font-bold uppercase tracking-wider">
-                          {m.sender === 'user' ? (user?.name || 'You') : m.sender === 'backend' ? 'Authoritative Backend' : 'MediQueue AI Agent'}
+                          {m.sender === 'user' ? (user?.name || 'You') : m.sender === 'backend' ? 'Authoritative Backend' : 'MediQueue AI Assistant'}
                         </span>
                         <div className="flex items-center gap-2">
                           {m.stateBadge && (
@@ -518,7 +550,7 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
 
                       <p className="whitespace-pre-line">{m.text}</p>
 
-                      {/* Render Confirmed Result Card if Present */}
+                      {/* Result Card: Confirmed Booking Receipt */}
                       {m.confirmedResult && (
                         <div className="mt-3 rounded-xl bg-slate-950 border border-emerald-500/40 p-4 space-y-2 font-sans">
                           <div className="flex items-center justify-between">
@@ -545,14 +577,83 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
                               <p className="font-bold text-white">{m.confirmedResult.doctorName}</p>
                             </div>
                             <div>
-                              <span className="text-slate-400">Time:</span>
+                              <span className="text-slate-400">Scheduled Time:</span>
                               <p className="font-bold text-white">{m.confirmedResult.scheduledTime}</p>
                             </div>
                           </div>
 
                           <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                            <span>Forensics SHA-256:</span>
+                            <span>Forensics Event Hash:</span>
                             <span className="text-emerald-300 font-mono">{m.confirmedResult.forensicHash.substring(0, 18)}...</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Result Card: Operational Summary Card */}
+                      {m.operationalSummary && (
+                        <div className="mt-3 rounded-xl bg-slate-950 border border-slate-800 p-3 space-y-1.5 font-sans">
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <span className="font-bold text-white text-xs">{m.operationalSummary.hospitalName}</span>
+                            <span className="text-[10px] font-mono text-sky-400 bg-sky-950/60 px-2 py-0.5 rounded border border-sky-800">
+                              {m.operationalSummary.surgeStatus}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 pt-1 text-[11px]">
+                            <div>
+                              <span className="text-slate-400 block">Occupancy</span>
+                              <strong className="text-white font-mono">{m.operationalSummary.bedOccupancyRate}</strong>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block">Beds In Use</span>
+                              <strong className="text-white font-mono">{m.operationalSummary.occupiedBeds} / {m.operationalSummary.totalBeds}</strong>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block">Today's OPD</span>
+                              <strong className="text-white font-mono">{m.operationalSummary.activeOpdBookingsToday}</strong>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Result Card: Bed Census List */}
+                      {m.beds && m.beds.length > 0 && (
+                        <div className="mt-3 rounded-xl bg-slate-950 border border-slate-800 p-3 space-y-1.5 font-sans">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                            Authorized Bed Inventory
+                          </span>
+                          <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto">
+                            {m.beds.map((b) => (
+                              <div key={b.bedId} className="flex items-center justify-between p-1.5 rounded bg-slate-900 border border-slate-800 text-[10px]">
+                                <span className="text-white font-mono">{b.bedNumber} ({b.type})</span>
+                                <span className={`px-1.5 py-0.2 rounded font-bold ${
+                                  b.status === 'available' ? 'text-emerald-400 bg-emerald-950' : 'text-rose-400 bg-rose-950'
+                                }`}>
+                                  {b.status}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Result Card: Existing Appointments List */}
+                      {m.appointments && m.appointments.length > 0 && (
+                        <div className="mt-3 rounded-xl bg-slate-950 border border-slate-800 p-3 space-y-1.5 font-sans">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                            Your Authorized Appointments
+                          </span>
+                          <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                            {m.appointments.map((a) => (
+                              <div key={a.appointmentId} className="p-2 rounded bg-slate-900 border border-slate-800 text-[11px] flex items-center justify-between">
+                                <div>
+                                  <p className="font-bold text-white">{a.appointmentId}</p>
+                                  <p className="text-[10px] text-slate-400">{a.slotTime}</p>
+                                </div>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-950 text-sky-300 border border-sky-800 uppercase">
+                                  {a.status}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
@@ -566,7 +667,7 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
                   </div>
                 ))}
 
-                {/* Render Interactive Confirmation Card if Active Intent exists */}
+                {/* Active Booking Confirmation Card */}
                 {activeIntent && (
                   <div className="pt-2">
                     <AppointmentConfirmationCard
@@ -582,21 +683,17 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Quick Prompt Chips */}
+              {/* Persona Context Suggested Prompts */}
               <div className="mt-4 pt-3 border-t border-slate-800">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 block">
-                  Recommended Prompts (1-Click)
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 block flex items-center gap-1.5">
+                  <Sparkles className="h-3 w-3 text-amber-400" />
+                  Suggested Prompts for {user ? user.role.replace('_', ' ').toUpperCase() : 'USER'}:
                 </span>
                 <div className="flex flex-wrap gap-2 text-xs">
-                  {[
-                    'Book a cardiologist for tomorrow',
-                    'Find available orthopedic doctors',
-                    'Book an emergency teleconsultation',
-                    'Check appointment availability at 10:30 AM',
-                  ].map((chip) => (
+                  {getSuggestedPrompts(user?.role).map((chip) => (
                     <button
                       key={chip}
-                      onClick={() => handleUserSearch(chip)}
+                      onClick={() => handleUserMessage(chip)}
                       disabled={isProcessing}
                       className="rounded-lg border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-[11px] text-slate-300 hover:border-sky-500 hover:text-white transition disabled:opacity-50"
                     >
@@ -610,7 +707,7 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  handleUserSearch(inputPrompt);
+                  handleUserMessage(inputPrompt);
                 }}
                 className="mt-3 flex gap-2"
               >
@@ -618,7 +715,7 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
                   type="text"
                   value={inputPrompt}
                   onChange={(e) => setInputPrompt(e.target.value)}
-                  placeholder="e.g., Book a cardiologist for tomorrow morning..."
+                  placeholder={`Ask a question or request an action as ${user?.role || 'user'}...`}
                   disabled={isProcessing}
                   className="flex-1 rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-xs text-white placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                 />
@@ -634,60 +731,55 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
             </div>
           </div>
 
-          {/* Right Column: Workflow Policy & Live Forensics Telemetry (1 Col) */}
+          {/* Right Column: Architectural Guardrails & Forensics Telemetry */}
           <div className="space-y-4">
-            {/* Core Principle Card */}
             <div className="rounded-2xl border border-sky-500/30 bg-gradient-to-b from-sky-950/40 to-slate-900/60 p-5 shadow-lg">
               <div className="flex items-center gap-2 text-sky-400 text-xs font-bold uppercase tracking-wider">
                 <Lock className="h-4 w-4" />
                 <span>MediQueue Core Design Principle</span>
               </div>
               <blockquote className="mt-2 text-xs italic text-slate-200 border-l-2 border-sky-400 pl-3 leading-relaxed">
-                "The AI may recommend and prepare an appointment, but only the authenticated backend can authorize and commit the booking."
+                "The AI may recommend and prepare an appointment or operational task, but only the authenticated backend can authorize and commit the change."
               </blockquote>
-              <p className="mt-2 text-[11px] text-slate-400">
-                The AI agent never invents booking IDs or claims an appointment is confirmed until the backend commits the atomic database transaction.
+              <p className="mt-2 text-[11px] text-slate-400 leading-normal">
+                Prevents hallucinated bookings, unauthorized clinical access, and data poisoning through backend identity and permission verification.
               </p>
             </div>
 
-            {/* State Machine Stepper Card */}
+            {/* Allowlisted Tools Registry */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-                Explicit State Machine Progression
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                Allowlisted Backend Functions
               </h3>
-              <div className="space-y-2.5 text-xs font-mono">
-                {[
-                  { state: 'SEARCHING', desc: 'Querying backend for real availability' },
-                  { state: 'AVAILABLE', desc: 'Valid doctor & slot retrieved' },
-                  { state: 'AWAITING_CONFIRMATION', desc: 'Review card displayed, 5m hold' },
-                  { state: 'CONFIRMED', desc: 'Patient confirmed & backend committed' },
-                ].map((s, idx) => {
-                  const isActive = currentState === s.state;
-                  return (
-                    <div
-                      key={s.state}
-                      className={`flex items-center gap-3 p-2 rounded-xl border transition ${
-                        isActive
-                          ? 'border-sky-500 bg-sky-950/40 text-white'
-                          : 'border-slate-800/80 bg-slate-950/40 text-slate-400'
-                      }`}
-                    >
-                      <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                        isActive ? 'bg-sky-500 text-white' : 'bg-slate-800 text-slate-400'
-                      }`}>
-                        {idx + 1}
-                      </span>
-                      <div>
-                        <p className="font-bold">{s.state}</p>
-                        <p className="text-[10px] text-slate-400 font-sans">{s.desc}</p>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="space-y-1.5 text-[11px] font-mono text-slate-300">
+                <div className="p-1.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <span>searchAppointmentSlots</span>
+                  <span className="text-[9px] text-sky-400">READ</span>
+                </div>
+                <div className="p-1.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <span>getMyAppointments</span>
+                  <span className="text-[9px] text-sky-400">READ</span>
+                </div>
+                <div className="p-1.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <span>getRequestStatus</span>
+                  <span className="text-[9px] text-sky-400">READ</span>
+                </div>
+                <div className="p-1.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <span>getAuthorizedBedAvailability</span>
+                  <span className="text-[9px] text-sky-400">SCOPE-CHECK</span>
+                </div>
+                <div className="p-1.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <span>getHospitalOperationalSummary</span>
+                  <span className="text-[9px] text-sky-400">AGGREGATE</span>
+                </div>
+                <div className="p-1.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <span>updateBedStatus</span>
+                  <span className="text-[9px] text-amber-400">MUTATE (AUTH)</span>
+                </div>
               </div>
             </div>
 
-            {/* Live Forensics Feed (Last 3 Events) */}
+            {/* Live Forensics Feed */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
@@ -723,32 +815,31 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
                 onClick={() => setActiveTab('forensics')}
                 className="mt-3 w-full py-2 text-center text-xs font-bold text-sky-400 hover:text-sky-300 transition"
               >
-                View Full Audit Chain &rarr;
+                Inspect Tamper-Evident Ledger &rarr;
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab: SHA-256 Forensics Hash Chain */}
+      {/* Tab 2: Forensics Hash Chain */}
       {activeTab === 'forensics' && (
         <div className="space-y-6">
-          {/* Forensics Status Banner */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-emerald-400 font-mono font-bold">
-                  Immutable Cryptographic Audit Trail
+                  Tamper-Evident Audit Trail
                 </span>
                 <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] text-slate-300 font-mono">
-                  SHA-256 Hash Chain
+                  RFC-6234 SHA-256 Chain
                 </span>
               </div>
               <h2 className="mt-1 text-xl font-bold text-white">
                 Cyber-Forensics Evidence Ledger
               </h2>
               <p className="mt-1 text-xs text-slate-400 max-w-xl">
-                Every booking intent, slot selection, confirmation attempt, and commit generates a cryptographically signed audit block linked to the previous block's hash.
+                Every booking intent, slot selection, confirmation attempt, and commit generates an immutable audit block linked to the previous block's SHA-256 hash.
               </p>
             </div>
 
@@ -771,7 +862,6 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
             </div>
           </div>
 
-          {/* Chain Integrity Alert */}
           {verificationResult && (
             <div className={`rounded-2xl border p-4 flex items-center justify-between ${
               verificationResult.isValid
@@ -786,7 +876,7 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
                 )}
                 <div>
                   <h4 className="font-bold text-sm">
-                    {verificationResult.isValid ? 'Cryptographic Hash Chain Valid' : 'Integrity Anomaly Detected!'}
+                    {verificationResult.isValid ? 'Cryptographic Hash Chain Valid & Unbroken' : 'Integrity Anomaly Detected!'}
                   </h4>
                   <p className="text-xs text-slate-300 mt-0.5">
                     {verificationResult.isValid
@@ -802,7 +892,6 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
             </div>
           )}
 
-          {/* Full Chain Blocks Table */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs font-mono">
@@ -859,30 +948,29 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
         </div>
       )}
 
-      {/* Tab: Professor Testing Suite (Section 7) */}
+      {/* Tab 3: Professor Testing Proving Grounds */}
       {activeTab === 'testSuite' && (
         <div className="space-y-6">
           <div className="rounded-2xl border border-amber-500/30 bg-amber-950/20 p-6">
             <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
               <Terminal className="h-4 w-4" />
-              <span>Section 7: Recommended Implementation & Security Testing Suite</span>
+              <span>Section 7 & 10: Automated Proving Grounds & Security Testing</span>
             </div>
             <h2 className="mt-1 text-xl font-bold text-white">
-              Controlled AI Negative Testing & Security Proving Grounds
+              Controlled AI Negative Testing & Security Demonstrations
             </h2>
             <p className="mt-1 text-xs text-slate-300 max-w-3xl leading-relaxed">
-              Use these interactive triggers during your presentation to prove to your professor that MediQueue strictly enforces RBAC, explicit patient consent, duplicate prevention, and race-condition tolerance.
+              Demonstrate to the professor that MediQueue strictly rejects unauthorized cross-patient requests, detects concurrent slot collisions, prevents duplicate commits, and flags database tampering through SHA-256 link validation.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Test 1: Cross-Patient Unauthorized Access */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 flex flex-col justify-between">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400">Security Test 1</span>
                 <h3 className="text-sm font-bold text-white mt-1">Cross-Patient Authorization Violation</h3>
                 <p className="text-xs text-slate-400 mt-2">
-                  Simulate a malicious attempt where Patient A tries to book or access an appointment for another patient ID.
+                  Simulate Patient A attempting to access or create a booking for Patient B. Backend enforces ownership and logs BOOKING_DENIED.
                 </p>
               </div>
               <button
@@ -893,13 +981,12 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
               </button>
             </div>
 
-            {/* Test 2: Race Condition / Slot Collision */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 flex flex-col justify-between">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Security Test 2</span>
                 <h3 className="text-sm font-bold text-white mt-1">Concurrent Booking Race Condition</h3>
                 <p className="text-xs text-slate-400 mt-2">
-                  Simulate another user claiming the slot right before confirmation. Proves transition to UNAVAILABLE instead of double-booking.
+                  Simulates another patient claiming the slot milliseconds prior. Demonstrates graceful transition to UNAVAILABLE instead of double-booking.
                 </p>
               </div>
               <button
@@ -910,7 +997,6 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
               </button>
             </div>
 
-            {/* Test 3: Missing Consent Defense */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 flex flex-col justify-between">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-sky-400">Security Test 3</span>
@@ -920,14 +1006,13 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
                 </p>
               </div>
               <button
-                onClick={() => handleUserSearch('Book a cardiologist for tomorrow')}
+                onClick={() => handleUserMessage('Book a cardiologist for tomorrow')}
                 className="mt-4 w-full rounded-xl border border-sky-800 bg-sky-950/60 py-2.5 text-xs font-bold text-sky-300 hover:bg-sky-900 transition"
               >
                 Prepare Intent & Inspect Checkbox
               </button>
             </div>
 
-            {/* Test 4: Cryptographic Forensics Tamper Test */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 flex flex-col justify-between">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">Security Test 4</span>
@@ -944,7 +1029,6 @@ Cryptographic Forensics Event Hash: ${result.forensicHash.substring(0, 16)}...`,
               </button>
             </div>
 
-            {/* Test 5: Idempotency Key Replay Protection */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 flex flex-col justify-between">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Security Test 5</span>
