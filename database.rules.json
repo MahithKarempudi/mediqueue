@@ -1,0 +1,34 @@
+{
+  "rules": {
+    "liveBeds": {
+      "$hospitalId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'super_admin' || ((root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin') && root.child('users').child(auth.uid).child('hospitalId').val() === $hospitalId))"
+      }
+    },
+    "liveQueues": {
+      "$hospitalId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'super_admin' || ((root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin') && root.child('users').child(auth.uid).child('hospitalId').val() === $hospitalId))"
+      }
+    },
+    "hospitalStatus": {
+      "$hospitalId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'super_admin' || (root.child('users').child(auth.uid).child('role').val() === 'hospital_admin' && root.child('users').child(auth.uid).child('hospitalId').val() === $hospitalId))"
+      }
+    },
+    "emergencyCapacity": {
+      "$hospitalId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'super_admin' || ((root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin') && root.child('users').child(auth.uid).child('hospitalId').val() === $hospitalId))"
+      }
+    },
+    "currentTokens": {
+      "$hospitalId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'super_admin' || ((root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin') && root.child('users').child(auth.uid).child('hospitalId').val() === $hospitalId))"
+      }
+    }
+  }
+}
