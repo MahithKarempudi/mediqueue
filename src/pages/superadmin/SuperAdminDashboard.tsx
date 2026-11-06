@@ -5,7 +5,7 @@ import { isFirebaseConfigured } from '@/services/firebase';
 import { seedDatabase } from '@/services/seed';
 import { auditChainService } from '@/services/forensics/auditChainService';
 import type { Hospital, User, IpdBed, Patient } from '@/types';
-import { PageHeader, Card, SectionHeader, MetricCard, Badge, Button, NoticeBanner } from '@/components/ui';
+import { PageHeader, Card, SectionHeader, MetricCard, Button, NoticeBanner } from '@/components/ui';
 import {
   ShieldCheck,
   Database,
@@ -40,7 +40,25 @@ export const SuperAdminDashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    loadPlatformStats();
+    let mounted = true;
+    const fetchStats = async () => {
+      const [h, u, b, p] = await Promise.all([
+        dbService.getCollection<Hospital>('hospitals'),
+        dbService.getCollection<User>('users'),
+        dbService.getCollection<IpdBed>('ipd_beds'),
+        dbService.getCollection<Patient>('patients'),
+      ]);
+      if (mounted) {
+        setHospitals(h);
+        setUsers(u);
+        setBeds(b);
+        setPatients(p);
+      }
+    };
+    fetchStats();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleRestoreBaselineDataset = async () => {

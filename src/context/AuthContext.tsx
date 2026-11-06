@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, UserRole, Patient } from '@/types';
 import { dbService } from '@/services/db';
+import { isFirebaseConfigured, auth as firebaseAuth } from '@/services/firebase';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+} from 'firebase/auth';
 
 export interface RoleProfile {
   user: User;
@@ -92,9 +99,13 @@ export const ROLE_PROFILES: Record<UserRole, RoleProfile> = {
   },
 };
 
+export type AuthMode = 'cloud_identity' | 'role_persona';
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  authMode: AuthMode;
+  sessionExpiresAt: string | null;
   switchRole: (role: UserRole) => Promise<void>;
   registerPatient: (details: {
     name: string;
@@ -105,6 +116,15 @@ interface AuthContextType {
     bloodGroup: string;
     address: string;
   }) => Promise<User>;
+  loginWithEmailPassword: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  registerAccount: (details: {
+    name: string;
+    email: string;
+    pass: string;
+    role: UserRole;
+    hospitalId?: string;
+  }) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
   reseedData: () => Promise<void>;
   hasRole: (roles: UserRole | UserRole[]) => boolean;
   canAccessHospital: (hospitalId?: string) => boolean;
@@ -113,10 +133,14 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const AUTH_STORAGE_KEY = 'mediqueue_current_session_user';
+const AUTH_MODE_KEY = 'mediqueue_session_auth_mode';
+const AUTH_EXPIRY_KEY = 'mediqueue_session_expires_at';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [authMode, setAuthMode] = useState<AuthMode>('role_persona');
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(null);
 
   useEffect(() => {
     const initAuthAndData = async () => {
@@ -125,8 +149,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { seedDatabase } = await import('@/services/seed');
         await seedDatabase(false);
 
-        // Restore saved session if any, migrating legacy session keys if needed
+        // Check for Firebase Auth listener if Firebase is configured
+        if (isFirebaseConfigured && firebaseAuth) {
+          onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
+            if (firebaseUser) {
+              const cloudUsers = await dbService.getCollection<User>('users');
+              const matched = cloudUsers.find((u) => u.uid === firebaseUser.uid || u.email === firebaseUser.email);
+              if (matched) {
+                setUser(matched);
+                setAuthMode('cloud_identity');
+                const exp = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
+                setSessionExpiresAt(exp);
+                localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(matched));
+                localStorage.setItem(AUTH_MODE_KEY, 'cloud_identity');
+                localStorage.setItem(AUTH_EXPIRY_KEY, exp);
+                setLoading(false);
+                return;
+              }
+            }
+          });
+        }
+
+        // Restore saved session if any
         const saved = localStorage.getItem(AUTH_STORAGE_KEY);
+        const savedMode = (localStorage.getItem(AUTH_MODE_KEY) as AuthMode) || 'role_persona';
+        const savedExp = localStorage.getItem(AUTH_EXPIRY_KEY);
+
+        // Check session expiration
+        if (savedExp && new Date(savedExp).getTime() < Date.now()) {
+          console.warn('Session expired, refreshing workspace session.');
+          localStorage.removeItem(AUTH_STORAGE_KEY);
+          localStorage.removeItem(AUTH_EXPIRY_KEY);
+        } else if (savedExp) {
+          setSessionExpiresAt(savedExp);
+        }
+
         if (saved) {
           const parsed: User = JSON.parse(saved);
           const roleProfile = ROLE_PROFILES[parsed.role] || ROLE_PROFILES.patient;
@@ -136,10 +193,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             setUser(parsed);
           }
+          setAuthMode(savedMode);
         } else {
           const defaultProfile = ROLE_PROFILES.patient.user;
           setUser(defaultProfile);
+          setAuthMode('role_persona');
+          const exp = new Date(Date.now() + 12 * 3600 * 1000).toISOString();
+          setSessionExpiresAt(exp);
           localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(defaultProfile));
+          localStorage.setItem(AUTH_MODE_KEY, 'role_persona');
+          localStorage.setItem(AUTH_EXPIRY_KEY, exp);
         }
       } catch (e) {
         console.error('Failed to load session or seed:', e);
@@ -163,7 +226,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const profile = ROLE_PROFILES[role];
     if (profile) {
       setUser(profile.user);
+      setAuthMode('role_persona');
+      const exp = new Date(Date.now() + 12 * 3600 * 1000).toISOString();
+      setSessionExpiresAt(exp);
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(profile.user));
+      localStorage.setItem(AUTH_MODE_KEY, 'role_persona');
+      localStorage.setItem(AUTH_EXPIRY_KEY, exp);
 
       // Save user to users collection in db
       await dbService.setDocument('users', profile.user.uid, profile.user);
@@ -176,6 +244,127 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
     }
+    setLoading(false);
+  };
+
+  const loginWithEmailPassword = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
+    setLoading(true);
+    try {
+      if (isFirebaseConfigured && firebaseAuth) {
+        const userCred = await signInWithEmailAndPassword(firebaseAuth, email, pass);
+        const cloudUsers = await dbService.getCollection<User>('users');
+        const matched = cloudUsers.find((u) => u.uid === userCred.user.uid || u.email === email);
+        if (matched) {
+          setUser(matched);
+          setAuthMode('cloud_identity');
+          const exp = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
+          setSessionExpiresAt(exp);
+          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(matched));
+          localStorage.setItem(AUTH_MODE_KEY, 'cloud_identity');
+          localStorage.setItem(AUTH_EXPIRY_KEY, exp);
+          setLoading(false);
+          return { success: true };
+        }
+      }
+
+      // Check registered users in persistence engine
+      const allUsers = await dbService.getCollection<User>('users');
+      const found = allUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
+
+      if (found) {
+        setUser(found);
+        setAuthMode('cloud_identity');
+        const exp = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
+        setSessionExpiresAt(exp);
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(found));
+        localStorage.setItem(AUTH_MODE_KEY, 'cloud_identity');
+        localStorage.setItem(AUTH_EXPIRY_KEY, exp);
+        setLoading(false);
+        return { success: true };
+      }
+
+      // If matching predefined role email
+      for (const r of Object.values(ROLE_PROFILES)) {
+        if (r.user.email.toLowerCase() === email.toLowerCase()) {
+          setUser(r.user);
+          setAuthMode('cloud_identity');
+          const exp = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
+          setSessionExpiresAt(exp);
+          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(r.user));
+          localStorage.setItem(AUTH_MODE_KEY, 'cloud_identity');
+          localStorage.setItem(AUTH_EXPIRY_KEY, exp);
+          setLoading(false);
+          return { success: true };
+        }
+      }
+
+      setLoading(false);
+      return { success: false, error: 'Invalid credentials. User not found in institutional directory.' };
+    } catch (err: any) {
+      setLoading(false);
+      return { success: false, error: err.message || 'Authentication failed.' };
+    }
+  };
+
+  const registerAccount = async (details: {
+    name: string;
+    email: string;
+    pass: string;
+    role: UserRole;
+    hospitalId?: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    setLoading(true);
+    try {
+      let uid = `user_${Date.now()}`;
+
+      if (isFirebaseConfigured && firebaseAuth) {
+        const userCred = await createUserWithEmailAndPassword(firebaseAuth, details.email, details.pass);
+        uid = userCred.user.uid;
+      }
+
+      const newUser: User = {
+        uid,
+        role: details.role,
+        name: details.name,
+        email: details.email,
+        hospitalId: details.hospitalId,
+        patientId: details.role === 'patient' ? `pat_${Date.now().toString().slice(-4)}` : undefined,
+        createdAt: new Date().toISOString(),
+      };
+
+      await dbService.setDocument('users', uid, newUser);
+      setUser(newUser);
+      setAuthMode('cloud_identity');
+      const exp = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
+      setSessionExpiresAt(exp);
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newUser));
+      localStorage.setItem(AUTH_MODE_KEY, 'cloud_identity');
+      localStorage.setItem(AUTH_EXPIRY_KEY, exp);
+      setLoading(false);
+      return { success: true };
+    } catch (err: any) {
+      setLoading(false);
+      return { success: false, error: err.message || 'Account registration failed.' };
+    }
+  };
+
+  const logout = async () => {
+    setLoading(true);
+    if (isFirebaseConfigured && firebaseAuth) {
+      try {
+        await signOut(firebaseAuth);
+      } catch (e) {
+        console.warn('Firebase signout warning:', e);
+      }
+    }
+    const defaultProfile = ROLE_PROFILES.patient.user;
+    setUser(defaultProfile);
+    setAuthMode('role_persona');
+    const exp = new Date(Date.now() + 12 * 3600 * 1000).toISOString();
+    setSessionExpiresAt(exp);
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(defaultProfile));
+    localStorage.setItem(AUTH_MODE_KEY, 'role_persona');
+    localStorage.setItem(AUTH_EXPIRY_KEY, exp);
     setLoading(false);
   };
 
@@ -218,6 +407,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await dbService.setDocument('patients', patientId, newPatient);
 
     setUser(newUser);
+    setAuthMode('cloud_identity');
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newUser));
     setLoading(false);
     return newUser;
@@ -243,8 +433,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         loading,
+        authMode,
+        sessionExpiresAt,
         switchRole,
         registerPatient,
+        loginWithEmailPassword,
+        registerAccount,
+        logout,
         reseedData,
         hasRole,
         canAccessHospital,

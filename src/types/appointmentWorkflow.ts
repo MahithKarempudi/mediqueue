@@ -79,6 +79,8 @@ export interface AssistantMessage {
   suggestedSlots?: AppointmentSlot[];
   bookingIntent?: BookingIntent;
   confirmedBooking?: ConfirmedBookingResult;
+  engineMode?: 'GEMINI_LLM_LIVE' | 'CLINICAL_NLU_DETERMINISTIC';
+  data?: Record<string, any>;
 }
 
 export type ForensicEventType =

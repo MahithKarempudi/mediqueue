@@ -1,16 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { dbService } from '@/services/db';
-import { rankEmergencyHospitals, type RankedEmergencyHospital } from '@/services/emergency/routingEngine';
+import { rankEmergencyHospitals } from '@/services/emergency/routingEngine';
 import type { Hospital, EmergencyCapacity } from '@/types';
 import { PageHeader, Card, SectionHeader, Badge, NoticeBanner } from '@/components/ui';
 import {
-  AlertTriangle,
   Navigation,
   PhoneCall,
   MapPin,
-  Bed,
   Clock,
-  ShieldAlert,
   CheckCircle2,
 } from 'lucide-react';
 
@@ -26,7 +23,6 @@ export const EmergencyRoutingPage: React.FC = () => {
   const [capacities, setCapacities] = useState<Record<string, EmergencyCapacity>>({});
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number }>(LOCATION_PRESETS[0]);
   const [requireIcu, setRequireIcu] = useState<boolean>(true);
-  const [rankedList, setRankedList] = useState<RankedEmergencyHospital[]>([]);
 
   useEffect(() => {
     const loadEmergencyData = async () => {
@@ -40,10 +36,9 @@ export const EmergencyRoutingPage: React.FC = () => {
     loadEmergencyData();
   }, []);
 
-  useEffect(() => {
-    if (hospitals.length === 0) return;
-    const ranked = rankEmergencyHospitals(userCoords, hospitals, capacities, requireIcu);
-    setRankedList(ranked);
+  const rankedList = useMemo(() => {
+    if (hospitals.length === 0) return [];
+    return rankEmergencyHospitals(userCoords, hospitals, capacities, requireIcu);
   }, [userCoords, hospitals, capacities, requireIcu]);
 
   const topRecommendation = rankedList[0];

@@ -15,6 +15,16 @@ export const aiAssistantService = {
       toolInvoked: res.toolName,
       suggestedSlots: res.slots,
       bookingIntent: res.intent,
+      data: {
+        engineMode: res.engineMode || 'CLINICAL_NLU_DETERMINISTIC',
+        doctors: res.doctors,
+        hospitals: res.hospitals,
+        queueStatus: res.queueStatus,
+        patientProfile: res.patientProfile,
+        appointments: res.appointments,
+        beds: res.beds,
+        operationalSummary: res.operationalSummary,
+      },
     };
   },
 };

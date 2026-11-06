@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dbService } from '@/services/db';
 import type { Hospital, IpdBed, EmergencyCapacity } from '@/types';
-import { PageHeader, Card, SectionHeader, Badge, NoticeBanner } from '@/components/ui';
+import { PageHeader, Card, Badge, NoticeBanner } from '@/components/ui';
 import {
   AlertTriangle,
   ShieldAlert,

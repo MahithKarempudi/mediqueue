@@ -46,11 +46,13 @@ export const LiveQueueTrackerPage: React.FC = () => {
 
   const hospitalDepts = departments.filter((d) => d.hospitalId === selectedHospitalId);
 
-  useEffect(() => {
-    if (hospitalDepts.length > 0 && !hospitalDepts.some((d) => d.departmentId === selectedDeptId)) {
-      setSelectedDeptId(hospitalDepts[0].departmentId);
+  const handleHospitalChange = (hospId: string) => {
+    setSelectedHospitalId(hospId);
+    const depts = departments.filter((d) => d.hospitalId === hospId);
+    if (depts.length > 0) {
+      setSelectedDeptId(depts[0].departmentId);
     }
-  }, [selectedHospitalId, hospitalDepts, selectedDeptId]);
+  };
 
   useEffect(() => {
     const path = `liveQueues/${selectedHospitalId}/${selectedDeptId}`;
@@ -115,7 +117,7 @@ export const LiveQueueTrackerPage: React.FC = () => {
             <label className="mq-label">Hospital Facility</label>
             <select
               value={selectedHospitalId}
-              onChange={(e) => setSelectedHospitalId(e.target.value)}
+              onChange={(e) => handleHospitalChange(e.target.value)}
               className="mq-input"
             >
               {hospitals.map((h) => (

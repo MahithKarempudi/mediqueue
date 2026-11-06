@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { auditChainService } from '@/services/forensics/auditChainService';
 import type { ForensicAuditLog } from '@/types/appointmentWorkflow';
 import { PageHeader, Card, SectionHeader, Badge, Button, SearchInput } from '@/components/ui';
@@ -10,12 +10,8 @@ import {
 } from 'lucide-react';
 
 export const SuperAdminLogsPage: React.FC = () => {
-  const [ledger, setLedger] = useState<ForensicAuditLog[]>([]);
-  const [integrity, setIntegrity] = useState({
-    valid: true,
-    totalEvents: 0,
-    details: 'Verified',
-  });
+  const [ledger, setLedger] = useState<ForensicAuditLog[]>(() => auditChainService.getLedger());
+  const [integrity, setIntegrity] = useState(() => auditChainService.verifyChainIntegrity());
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState<'ALL' | 'INFO' | 'WARN' | 'CRITICAL'>('ALL');
 
@@ -23,10 +19,6 @@ export const SuperAdminLogsPage: React.FC = () => {
     setLedger(auditChainService.getLedger());
     setIntegrity(auditChainService.verifyChainIntegrity());
   };
-
-  useEffect(() => {
-    refreshAuditLedger();
-  }, []);
 
   const filteredLogs = ledger.filter((entry) => {
     const matchesSeverity = severityFilter === 'ALL' || entry.severity === severityFilter;

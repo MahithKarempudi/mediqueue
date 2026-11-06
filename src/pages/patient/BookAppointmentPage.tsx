@@ -65,8 +65,20 @@ export const BookAppointmentPage: React.FC = () => {
       setStaffList(s);
       setMyAppointments(a.filter((item) => item.patientId === patientId));
 
-      if (h.length > 0 && !selectedHospitalId) {
-        setSelectedHospitalId(h[0].hospitalId);
+      if (h.length > 0) {
+        const initHosp = h[0].hospitalId;
+        setSelectedHospitalId(initHosp);
+        const initDepts = d.filter((item) => item.hospitalId === initHosp);
+        if (initDepts.length > 0) {
+          const initDept = initDepts[0].departmentId;
+          setSelectedDeptId(initDept);
+          const initDocs = s.filter(
+            (st) => st.hospitalId === initHosp && st.departmentId === initDept && st.roleInHospital === 'doctor'
+          );
+          if (initDocs.length > 0) {
+            setSelectedDoctorId(initDocs[0].staffId);
+          }
+        }
       }
     };
     loadMetadata();
@@ -82,21 +94,26 @@ export const BookAppointmentPage: React.FC = () => {
     (s) => s.hospitalId === selectedHospitalId && s.departmentId === selectedDeptId && s.roleInHospital === 'doctor'
   );
 
-  // Sync department when hospital changes
-  useEffect(() => {
-    if (hospitalDepts.length > 0 && !hospitalDepts.some((d) => d.departmentId === selectedDeptId)) {
-      setSelectedDeptId(hospitalDepts[0].departmentId);
-    }
-  }, [selectedHospitalId, hospitalDepts, selectedDeptId]);
+  const handleHospitalChange = (newHospId: string) => {
+    setSelectedHospitalId(newHospId);
+    setActiveIntent(null);
+    const availDepts = departments.filter((d) => d.hospitalId === newHospId);
+    const nextDeptId = availDepts[0]?.departmentId || '';
+    setSelectedDeptId(nextDeptId);
+    const availDocs = staffList.filter(
+      (s) => s.hospitalId === newHospId && s.departmentId === nextDeptId && s.roleInHospital === 'doctor'
+    );
+    setSelectedDoctorId(availDocs[0]?.staffId || '');
+  };
 
-  // Sync doctor when department changes
-  useEffect(() => {
-    if (deptDoctors.length > 0) {
-      setSelectedDoctorId(deptDoctors[0].staffId);
-    } else {
-      setSelectedDoctorId('');
-    }
-  }, [selectedDeptId, selectedHospitalId, deptDoctors.length]);
+  const handleDepartmentChange = (newDeptId: string) => {
+    setSelectedDeptId(newDeptId);
+    setActiveIntent(null);
+    const availDocs = staffList.filter(
+      (s) => s.hospitalId === selectedHospitalId && s.departmentId === newDeptId && s.roleInHospital === 'doctor'
+    );
+    setSelectedDoctorId(availDocs[0]?.staffId || '');
+  };
 
   // Query authoritative slots whenever Hospital, Department, Doctor, or Date changes
   useEffect(() => {
@@ -157,7 +174,7 @@ export const BookAppointmentPage: React.FC = () => {
     if (!user || !activeIntent) return;
     setIsSubmitting(true);
     setErrorMessage(null);
-    activeIntent.consultationType = chosenType;
+    setActiveIntent((prev) => (prev ? { ...prev, consultationType: chosenType } : null));
 
     const response = await aiAppointmentBackend.confirmAppointment(
       {
@@ -329,10 +346,7 @@ export const BookAppointmentPage: React.FC = () => {
                 <label className="mq-label">Hospital Facility</label>
                 <select
                   value={selectedHospitalId}
-                  onChange={(e) => {
-                    setSelectedHospitalId(e.target.value);
-                    setActiveIntent(null);
-                  }}
+                  onChange={(e) => handleHospitalChange(e.target.value)}
                   className="mq-input"
                 >
                   {hospitals.map((h) => (
@@ -347,10 +361,7 @@ export const BookAppointmentPage: React.FC = () => {
                 <label className="mq-label">Clinical Department</label>
                 <select
                   value={selectedDeptId}
-                  onChange={(e) => {
-                    setSelectedDeptId(e.target.value);
-                    setActiveIntent(null);
-                  }}
+                  onChange={(e) => handleDepartmentChange(e.target.value)}
                   className="mq-input"
                 >
                   {hospitalDepts.map((d) => (

@@ -3,11 +3,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   auditChainService,
   sha256Sync,
-  serializePayload,
-  computeEventHash,
   GENESIS_PREV_HASH,
 } from '../src/services/forensics/auditChainService';
-import type { ForensicAuditEvent, UserRole } from '../src/types';
+import type { UserRole } from '../src/types';
 
 describe('Cyber-Forensics Tamper-Evident Audit Hash Chain', () => {
   beforeEach(() => {

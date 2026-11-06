@@ -10,7 +10,6 @@ import type {
 } from '@/types';
 import { PageHeader, Card, SectionHeader, Badge, Button, NoticeBanner } from '@/components/ui';
 import {
-  Stethoscope,
   Play,
   SkipForward,
   CheckCircle2,
@@ -391,7 +390,7 @@ export const DoctorOpdQueuePage: React.FC = () => {
               ))}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
               <input
                 type="text"
                 value={newMedName}
@@ -401,20 +400,36 @@ export const DoctorOpdQueuePage: React.FC = () => {
               />
               <input
                 type="text"
+                value={newMedDosage}
+                onChange={(e) => setNewMedDosage(e.target.value)}
+                placeholder="Dosage (e.g. 1 Tab)"
+                className="mq-input"
+              />
+              <input
+                type="text"
                 value={newMedFreq}
                 onChange={(e) => setNewMedFreq(e.target.value)}
                 placeholder="Frequency"
                 className="mq-input"
               />
-              <Button
-                type="button"
-                variant="secondary"
-                size="md"
-                icon={<Plus className="w-4 h-4" />}
-                onClick={handleAddMedication}
-              >
-                Add Agent
-              </Button>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newMedDuration}
+                  onChange={(e) => setNewMedDuration(e.target.value)}
+                  placeholder="Duration"
+                  className="mq-input flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="md"
+                  icon={<Plus className="w-4 h-4" />}
+                  onClick={handleAddMedication}
+                >
+                  Add
+                </Button>
+              </div>
             </div>
           </Card>
 
