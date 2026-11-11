@@ -21,7 +21,7 @@ import type {
   Prescription,
   LiveQueue,
 } from '@/types';
-import { ROLE_PROFILES } from '@/context/AuthContext';
+import { ROLE_PROFILES } from '@/context/roleProfiles';
 
 export const seedDatabase = async (force: boolean = false): Promise<{ success: boolean; message: string }> => {
   try {

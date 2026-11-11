@@ -8,11 +8,16 @@ interface ProtectedRouteProps {
   allowedRoles?: UserRole[];
 }
 
+const checkIsExpired = (expiresAt: string | null): boolean => {
+  if (!expiresAt) return false;
+  return new Date(expiresAt).getTime() < Date.now();
+};
+
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   allowedRoles,
 }) => {
-  const { user, loading, hasRole } = useAuth();
+  const { user, loading, hasRole, isSessionExpired, sessionExpiresAt } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -25,6 +30,20 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           </p>
         </div>
       </div>
+    );
+  }
+
+  // Handle expired sessions
+  if (isSessionExpired || checkIsExpired(sessionExpiresAt)) {
+    return (
+      <Navigate
+        to="/unauthorized"
+        state={{
+          reason: 'session_expired',
+          from: location.pathname,
+        }}
+        replace
+      />
     );
   }
 

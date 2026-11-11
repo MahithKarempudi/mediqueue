@@ -90,7 +90,14 @@ export const PatientDashboard: React.FC = () => {
     };
   }, [patientId]);
 
-  const activeAppointments = appointments.filter((a) => a.status === 'scheduled');
+  const activeAppointments = appointments.filter(
+    (a) =>
+      a.status === 'scheduled' ||
+      a.status === 'Confirmed' ||
+      a.status === 'confirmed' ||
+      a.status === 'Pending' ||
+      a.status === 'pending'
+  );
   const nextAppt = activeAppointments[0];
   const nextHospital = hospitals.find((h) => h.hospitalId === (nextAppt?.hospitalId || 'hosp_metro_01'));
   const nextDept = departments.find((d) => d.departmentId === (nextAppt?.departmentId || 'dept_cardio_01'));
@@ -197,8 +204,17 @@ export const PatientDashboard: React.FC = () => {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="info" dot>
-                        CONFIRMED OPD SLOT
+                      <Badge
+                        variant={
+                          nextAppt.status === 'Confirmed' || nextAppt.status === 'confirmed' || nextAppt.status === 'scheduled'
+                            ? 'success'
+                            : nextAppt.status === 'Pending' || nextAppt.status === 'pending'
+                            ? 'warning'
+                            : 'info'
+                        }
+                        dot
+                      >
+                        {nextAppt.status.toUpperCase()} OPD SLOT
                       </Badge>
                       <span className="text-xs font-mono text-slate-500">Ref: {nextAppt.appointmentId}</span>
                     </div>

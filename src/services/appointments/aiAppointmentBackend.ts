@@ -376,7 +376,7 @@ export const aiAppointmentBackend = {
         departmentId: intent.departmentId,
         doctorId: intent.doctorId,
         slotTime: `${intent.requestedDate} ${intent.preferredTime}`,
-        status: 'scheduled',
+        status: 'Confirmed',
       };
       await dbService.setDocument('opd_appointments', authoritativeAppointmentId, newAppointment);
 
@@ -543,7 +543,83 @@ export const aiAppointmentBackend = {
   },
 
   // -------------------------------------------------------------
-  // 7. getRequestStatus
+  // 7. rejectAppointment (Transitions to: Rejected)
+  // Staff / Hospital Admin can reject an appointment with clinical rationale
+  // -------------------------------------------------------------
+  async rejectAppointment(
+    params: { appointmentId: string; reason: string },
+    caller: User
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!caller || !caller.uid) {
+      return { success: false, error: 'UNAUTHENTICATED' };
+    }
+
+    if (caller.role !== 'staff' && caller.role !== 'hospital_admin' && caller.role !== 'super_admin') {
+      return { success: false, error: 'FORBIDDEN: Only clinical staff or hospital admins may reject an appointment.' };
+    }
+
+    const { appointment, error } = await this.getAppointmentSummary(params.appointmentId, caller);
+    if (error || !appointment) {
+      return { success: false, error: error || 'Appointment not found' };
+    }
+
+    await dbService.updateDocument('opd_appointments', params.appointmentId, {
+      status: 'Rejected',
+    });
+
+    auditChainService.appendEvent({
+      eventType: 'BOOKING_DENIED',
+      severity: 'WARN',
+      actor: { uid: caller.uid, role: caller.role, name: caller.name, email: caller.email },
+      appointmentId: params.appointmentId,
+      hospitalId: appointment.hospitalId,
+      targetPatientId: appointment.patientId,
+      details: `Appointment ${params.appointmentId} rejected by ${caller.role}. Rationale: ${params.reason}`,
+    });
+
+    return { success: true };
+  },
+
+  // -------------------------------------------------------------
+  // 8. completeAppointment (Transitions to: Completed)
+  // Staff marks appointment consultation completed
+  // -------------------------------------------------------------
+  async completeAppointment(
+    params: { appointmentId: string; clinicalNotes?: string },
+    caller: User
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!caller || !caller.uid) {
+      return { success: false, error: 'UNAUTHENTICATED' };
+    }
+
+    if (caller.role !== 'staff' && caller.role !== 'hospital_admin' && caller.role !== 'super_admin') {
+      return { success: false, error: 'FORBIDDEN: Only clinical staff or hospital admins may complete an appointment.' };
+    }
+
+    const { appointment, error } = await this.getAppointmentSummary(params.appointmentId, caller);
+    if (error || !appointment) {
+      return { success: false, error: error || 'Appointment not found' };
+    }
+
+    await dbService.updateDocument('opd_appointments', params.appointmentId, {
+      status: 'Completed',
+    });
+
+    auditChainService.appendEvent({
+      eventType: 'BOOKING_COMMITTED',
+      severity: 'INFO',
+      actor: { uid: caller.uid, role: caller.role, name: caller.name, email: caller.email },
+      appointmentId: params.appointmentId,
+      hospitalId: appointment.hospitalId,
+      targetPatientId: appointment.patientId,
+      details: `Consultation completed for appointment ${params.appointmentId}.`,
+    });
+
+    return { success: true };
+  },
+
+  // -------------------------------------------------------------
+  // 9. getRequestStatus
   // Returns authoritative status of an intent or appointment
   // -------------------------------------------------------------
   getRequestStatus(intentId: string): AppointmentWorkflowState {

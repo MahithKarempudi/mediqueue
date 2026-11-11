@@ -11,6 +11,10 @@ import {
   ClipboardList,
 } from 'lucide-react';
 
+const createAdmissionId = () => `ADM-${Date.now()}`;
+const calculateDaysStayed = (admittedAt: string) => Math.max(1, Math.ceil((Date.now() - new Date(admittedAt).getTime()) / (1000 * 60 * 60 * 24)));
+const createDischargeBillId = () => `BILL-IPD-${Date.now().toString().slice(-5)}`;
+
 export const IpdAdmissionsPage: React.FC = () => {
   const { user } = useAuth();
   const hospitalId = user?.hospitalId || 'hosp_metro_01';
@@ -61,7 +65,7 @@ export const IpdAdmissionsPage: React.FC = () => {
     e.preventDefault();
     if (!selectedPatientId || !selectedBedId || !diagnosis.trim()) return;
 
-    const admId = `ADM-${Date.now()}`;
+    const admId = createAdmissionId();
     const newAdm: IpdAdmission = {
       admissionId: admId,
       patientId: selectedPatientId,
@@ -120,13 +124,10 @@ export const IpdAdmissionsPage: React.FC = () => {
     }
 
     // Generate automated IPD discharge invoice
-    const daysStayed = Math.max(
-      1,
-      Math.ceil((Date.now() - new Date(adm.admittedAt).getTime()) / (1000 * 60 * 60 * 24))
-    );
+    const daysStayed = calculateDaysStayed(adm.admittedAt);
     const dailyRate = bedObj?.type === 'ICU' ? 6500 : 2500;
     const roomCharge = daysStayed * dailyRate;
-    const billId = `BILL-IPD-${Date.now().toString().slice(-5)}`;
+    const billId = createDischargeBillId();
     const dischargeBill: Billing = {
       billId,
       patientId: adm.patientId,

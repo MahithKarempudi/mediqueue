@@ -12,7 +12,10 @@ service cloud.firestore {
     }
     
     function hasRole(role) {
-      return isAuthenticated() && getUserData().role == role;
+      return isAuthenticated() && (
+        (request.auth.token != null && request.auth.token.role == role) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == role)
+      );
     }
     
     function isSuperAdmin() {
@@ -37,7 +40,10 @@ service cloud.firestore {
     
     // Hospital Scope Isolation: Must match caller's assigned hospitalId
     function isSameHospital(hospitalId) {
-      return isAuthenticated() && getUserData().hospitalId == hospitalId;
+      return isAuthenticated() && (
+        (request.auth.token != null && request.auth.token.hospitalId == hospitalId) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().hospitalId == hospitalId)
+      );
     }
     
     function isSelf(uid) {
@@ -50,18 +56,37 @@ service cloud.firestore {
         .hasAny(['role', 'hospitalId', 'patientId', 'privileges']);
     }
 
-    // 1. Users Collection
+    // Validates supported appointment statuses
+    function isValidAppointmentStatus(status) {
+      return status in [
+        'Pending', 'Confirmed', 'Cancelled', 'Completed', 'Rejected',
+        'pending', 'confirmed', 'cancelled', 'completed', 'rejected',
+        'scheduled', 'checked_in'
+      ];
+    }
+
+    // 1. Users Collection (Strict Least Privilege)
     match /users/{userId} {
-      allow read: if isAuthenticated() && (isSelf(userId) || isSuperAdmin() || (isHospitalAdmin() && isSameHospital(resource.data.hospitalId)));
-      allow create: if isSuperAdmin();
+      allow read: if isAuthenticated() && (
+        isSelf(userId) ||
+        isSuperAdmin() ||
+        (isHospitalAdmin() && isSameHospital(resource.data.hospitalId))
+      );
+      // Patients can self-register their own profile with role 'patient' only
+      allow create: if isSuperAdmin() || (
+        isAuthenticated() &&
+        isSelf(userId) &&
+        request.resource.data.role == 'patient' &&
+        !('hospitalId' in request.resource.data)
+      );
       allow update: if isAuthenticated() && (
-        isSuperAdmin() || 
+        isSuperAdmin() ||
         (isSelf(userId) && isNotEscalatingPrivileges())
       );
       allow delete: if isSuperAdmin();
     }
 
-    // 2. Hospitals Directory (Public for scheduling, admin-managed)
+    // 2. Hospitals Directory (Public for directory & booking, admin-managed)
     match /hospitals/{hospitalId} {
       allow read: if isAuthenticated();
       allow create, delete: if isSuperAdmin();
@@ -99,22 +124,25 @@ service cloud.firestore {
       allow delete: if false; // Patient profiles are permanent legal health records
     }
 
-    // 6. OPD Appointments
+    // 6. OPD Appointments (Explicit Status Lifecycle: Pending, Confirmed, Cancelled, Completed, Rejected)
     match /opd_appointments/{appointmentId} {
       allow read: if isAuthenticated() && (
         (isPatient() && resource.data.patientId == getUserData().patientId) ||
         (isHospitalStaff() && isSameHospital(resource.data.hospitalId)) ||
-        (isHospitalAdmin() && isSameHospital(resource.data.hospitalId))
+        (isHospitalAdmin() && isSameHospital(resource.data.hospitalId)) ||
+        isSuperAdmin()
       );
       allow create: if isAuthenticated() && (
         (isPatient() && request.resource.data.patientId == getUserData().patientId) ||
-        (isHospitalStaff() && isSameHospital(request.resource.data.hospitalId))
-      );
+        (isHospitalStaff() && isSameHospital(request.resource.data.hospitalId)) ||
+        isSuperAdmin()
+      ) && isValidAppointmentStatus(request.resource.data.status);
       allow update: if isAuthenticated() && (
         (isPatient() && resource.data.patientId == getUserData().patientId) ||
         (isHospitalStaff() && isSameHospital(resource.data.hospitalId)) ||
-        (isHospitalAdmin() && isSameHospital(resource.data.hospitalId))
-      );
+        (isHospitalAdmin() && isSameHospital(resource.data.hospitalId)) ||
+        isSuperAdmin()
+      ) && isValidAppointmentStatus(request.resource.data.status);
       allow delete: if false;
     }
 
@@ -123,7 +151,8 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated() && (
         (isHospitalStaff() && isSameHospital(request.resource.data.hospitalId)) ||
-        (isHospitalAdmin() && isSameHospital(request.resource.data.hospitalId))
+        (isHospitalAdmin() && isSameHospital(request.resource.data.hospitalId)) ||
+        isSuperAdmin()
       );
     }
 
@@ -131,7 +160,8 @@ service cloud.firestore {
     match /opd_visits/{visitId} {
       allow read: if isAuthenticated() && (
         (isPatient() && resource.data.patientId == getUserData().patientId) ||
-        (isHospitalStaff() && isSameHospital(resource.data.hospitalId))
+        (isHospitalStaff() && isSameHospital(resource.data.hospitalId)) ||
+        isSuperAdmin()
       );
       allow write: if isAuthenticated() && isHospitalStaff() && isSameHospital(request.resource.data.hospitalId);
     }
@@ -141,11 +171,13 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (
         (isPatient() && resource.data.patientId == getUserData().patientId) ||
         (isHospitalStaff() && isSameHospital(resource.data.hospitalId)) ||
-        (isHospitalAdmin() && isSameHospital(resource.data.hospitalId))
+        (isHospitalAdmin() && isSameHospital(resource.data.hospitalId)) ||
+        isSuperAdmin()
       );
       allow write: if isAuthenticated() && (
         (isHospitalStaff() && isSameHospital(request.resource.data.hospitalId)) ||
-        (isHospitalAdmin() && isSameHospital(request.resource.data.hospitalId))
+        (isHospitalAdmin() && isSameHospital(request.resource.data.hospitalId)) ||
+        isSuperAdmin()
       );
     }
 
@@ -153,78 +185,111 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated() && (
         (isHospitalStaff() && isSameHospital(request.resource.data.hospitalId)) ||
-        (isHospitalAdmin() && isSameHospital(request.resource.data.hospitalId))
+        (isHospitalAdmin() && isSameHospital(request.resource.data.hospitalId)) ||
+        isSuperAdmin()
       );
     }
 
-    // 10. Pathology Orders & Reports (Strict PHI Access)
+    // 10. Pathology Orders & Reports (Strict PHI Access & Hospital Scope Isolation)
     match /pathology_orders/{orderId} {
       allow read: if isAuthenticated() && (
         (isPatient() && resource.data.patientId == getUserData().patientId) ||
-        isHospitalStaff()
+        (isHospitalStaff() && isSameHospital(resource.data.hospitalId)) ||
+        (isHospitalAdmin() && isSameHospital(resource.data.hospitalId)) ||
+        isSuperAdmin()
       );
-      allow write: if isAuthenticated() && isHospitalStaff();
+      allow write: if isAuthenticated() && (
+        (isHospitalStaff() && isSameHospital(request.resource.data.hospitalId)) ||
+        isSuperAdmin()
+      );
     }
     match /pathology_reports/{reportId} {
       allow read: if isAuthenticated() && (
         (isPatient() && resource.data.patientId == getUserData().patientId) ||
-        isHospitalStaff()
+        (isHospitalStaff() && isSameHospital(resource.data.hospitalId)) ||
+        (isHospitalAdmin() && isSameHospital(resource.data.hospitalId)) ||
+        isSuperAdmin()
       );
-      allow write: if isAuthenticated() && isHospitalStaff();
+      allow write: if isAuthenticated() && (
+        (isHospitalStaff() && isSameHospital(request.resource.data.hospitalId)) ||
+        isSuperAdmin()
+      );
     }
 
-    // 11. Radiology Orders & Reports (Strict PHI Access)
+    // 11. Radiology Orders & Reports (Strict PHI Access & Hospital Scope Isolation)
     match /radiology_orders/{orderId} {
       allow read: if isAuthenticated() && (
         (isPatient() && resource.data.patientId == getUserData().patientId) ||
-        isHospitalStaff()
+        (isHospitalStaff() && isSameHospital(resource.data.hospitalId)) ||
+        (isHospitalAdmin() && isSameHospital(resource.data.hospitalId)) ||
+        isSuperAdmin()
       );
-      allow write: if isAuthenticated() && isHospitalStaff();
+      allow write: if isAuthenticated() && (
+        (isHospitalStaff() && isSameHospital(request.resource.data.hospitalId)) ||
+        isSuperAdmin()
+      );
     }
     match /radiology_reports/{reportId} {
       allow read: if isAuthenticated() && (
         (isPatient() && resource.data.patientId == getUserData().patientId) ||
-        isHospitalStaff()
+        (isHospitalStaff() && isSameHospital(resource.data.hospitalId)) ||
+        (isHospitalAdmin() && isSameHospital(resource.data.hospitalId)) ||
+        isSuperAdmin()
       );
-      allow write: if isAuthenticated() && isHospitalStaff();
+      allow write: if isAuthenticated() && (
+        (isHospitalStaff() && isSameHospital(request.resource.data.hospitalId)) ||
+        isSuperAdmin()
+      );
     }
 
-    // 12. Billing & Payments
+    // 12. Billing & Payments (Protected Ledger with Strict Write Validation)
     match /billing/{billId} {
       allow read: if isAuthenticated() && (
         (isPatient() && resource.data.patientId == getUserData().patientId) ||
         (isHospitalStaff() && isSameHospital(resource.data.hospitalId)) ||
-        (isHospitalAdmin() && isSameHospital(resource.data.hospitalId))
+        (isHospitalAdmin() && isSameHospital(resource.data.hospitalId)) ||
+        isSuperAdmin()
       );
       allow write: if isAuthenticated() && (
         (isHospitalStaff() && isSameHospital(request.resource.data.hospitalId)) ||
-        (isHospitalAdmin() && isSameHospital(request.resource.data.hospitalId))
+        (isHospitalAdmin() && isSameHospital(request.resource.data.hospitalId)) ||
+        isSuperAdmin()
       );
     }
     match /payments/{paymentId} {
       allow read: if isAuthenticated() && (
         (isPatient() && resource.data.patientId == getUserData().patientId) ||
-        isHospitalStaff()
+        (isHospitalStaff() && isSameHospital(resource.data.hospitalId)) ||
+        (isHospitalAdmin() && isSameHospital(resource.data.hospitalId)) ||
+        isSuperAdmin()
       );
-      allow write: if isAuthenticated();
+      // Only authorized hospital billing staff, admins, or verified paying patients can record payments
+      allow create: if isAuthenticated() && (
+        (isPatient() && request.resource.data.patientId == getUserData().patientId) ||
+        (isHospitalStaff() && isSameHospital(request.resource.data.hospitalId)) ||
+        isSuperAdmin()
+      ) && request.resource.data.amount > 0;
+      allow update, delete: if isSuperAdmin(); // Financial ledgers are immutable once created
     }
 
     // 13. Patient Health Timeline
     match /patient_records/{patientId} {
       allow read: if isAuthenticated() && (
         (isPatient() && resource.data.patientId == getUserData().patientId) ||
-        isHospitalStaff()
+        (isHospitalStaff() && isSameHospital(resource.data.hospitalId)) ||
+        isSuperAdmin()
       );
-      allow write: if isAuthenticated() && isHospitalStaff();
+      allow write: if isAuthenticated() && isHospitalStaff() && isSameHospital(request.resource.data.hospitalId);
     }
 
     // 14. Prescriptions
     match /prescriptions/{prescriptionId} {
       allow read: if isAuthenticated() && (
         (isPatient() && resource.data.patientId == getUserData().patientId) ||
-        isHospitalStaff()
+        (isHospitalStaff() && isSameHospital(resource.data.hospitalId)) ||
+        isSuperAdmin()
       );
-      allow write: if isAuthenticated() && isHospitalStaff();
+      allow write: if isAuthenticated() && isHospitalStaff() && isSameHospital(request.resource.data.hospitalId);
     }
 
     // 15. Aggregate Public Health Reports (Government Surveillance)

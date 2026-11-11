@@ -7,10 +7,13 @@ export type AppointmentWorkflowState =
   | 'SEARCHING'
   | 'AVAILABLE'
   | 'AWAITING_CONFIRMATION'
+  | 'PENDING'
   | 'CONFIRMED'
   | 'EXPIRED'
   | 'UNAVAILABLE'
   | 'CANCELLED'
+  | 'COMPLETED'
+  | 'REJECTED'
   | 'FAILED';
 
 export type ConsultationType = 'in_person' | 'teleconsultation' | 'In-Person OPD' | 'Telehealth Video';

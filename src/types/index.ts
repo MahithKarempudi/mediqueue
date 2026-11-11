@@ -71,7 +71,19 @@ export interface Patient {
   createdAt: string;
 }
 
-export type AppointmentStatus = 'scheduled' | 'checked_in' | 'completed' | 'cancelled';
+export type AppointmentStatus =
+  | 'Pending'
+  | 'Confirmed'
+  | 'Cancelled'
+  | 'Completed'
+  | 'Rejected'
+  | 'pending'
+  | 'confirmed'
+  | 'cancelled'
+  | 'completed'
+  | 'rejected'
+  | 'scheduled'
+  | 'checked_in';
 
 export interface OpdAppointment {
   appointmentId: string;

@@ -31,6 +31,8 @@ import {
   FileText,
 } from 'lucide-react';
 
+const createUserMsgId = () => `user_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
 export const AiAppointmentBookingPage: React.FC = () => {
   const { user } = useAuth();
   const [messages, setMessages] = useState<AssistantMessage[]>([
@@ -65,7 +67,7 @@ export const AiAppointmentBookingPage: React.FC = () => {
     if (!query || !user || isProcessing) return;
 
     const userMsg: AssistantMessage = {
-      id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      id: createUserMsgId(),
       sender: 'user',
       text: query,
       timestamp: new Date().toISOString(),
@@ -303,7 +305,7 @@ export const AiAppointmentBookingPage: React.FC = () => {
           {/* Chat Interface (8 Columns) */}
           <div className="lg:col-span-8 flex flex-col bg-white rounded-xl border border-slate-200 shadow-clinical overflow-hidden h-[700px]">
             {/* Chat Header */}
-            <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-navy-950 text-teal-400 flex items-center justify-center">
                   <Sparkles className="w-4 h-4" />
@@ -313,7 +315,20 @@ export const AiAppointmentBookingPage: React.FC = () => {
                   <p className="text-xs text-slate-500">10 Allowlisted Backend Operations • Zero Unchecked Database Queries</p>
                 </div>
               </div>
-              <Badge variant="teal">Two-Step Consent Required</Badge>
+              <div className="flex items-center gap-2">
+                {import.meta.env.VITE_GEMINI_API_KEY && import.meta.env.VITE_GEMINI_API_KEY !== 'YOUR_GEMINI_API_KEY' ? (
+                  <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-teal-50 text-teal-800 border border-teal-200 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
+                    Engine: Gemini 1.5 Flash (Live API)
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1.5" title="LLM API key not configured. Operating in verified deterministic clinical rule-based fallback mode.">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    Engine: Deterministic Clinical NLU (Fallback Mode)
+                  </span>
+                )}
+                <Badge variant="teal">Two-Step Consent Required</Badge>
+              </div>
             </div>
 
             {/* Messages Container */}
@@ -334,10 +349,21 @@ export const AiAppointmentBookingPage: React.FC = () => {
                         : 'bg-white text-slate-800 border border-slate-200 shadow-2xs rounded-bl-xs'
                     }`}
                   >
-                    {msg.toolInvoked && (
-                      <div className="mb-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[11px] font-mono text-slate-700">
-                        <Terminal className="w-3 h-3 text-teal-600" />
-                        Tool: {msg.toolInvoked}()
+                    {msg.sender === 'assistant' && (
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        {msg.toolInvoked && (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[11px] font-mono text-slate-700">
+                            <Terminal className="w-3 h-3 text-teal-600" />
+                            Tool: {msg.toolInvoked}()
+                          </div>
+                        )}
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${
+                          msg.data?.engineMode === 'GEMINI_LLM_LIVE'
+                            ? 'bg-teal-50 text-teal-800 border-teal-200'
+                            : 'bg-amber-50/80 text-amber-800 border-amber-200'
+                        }`}>
+                          {msg.data?.engineMode === 'GEMINI_LLM_LIVE' ? 'Gemini 1.5 Live LLM' : 'Clinical NLU Fallback'}
+                        </span>
                       </div>
                     )}
 

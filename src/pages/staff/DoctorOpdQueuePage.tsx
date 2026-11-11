@@ -198,7 +198,18 @@ export const DoctorOpdQueuePage: React.FC = () => {
       await dbService.setDocument('radiology_orders', roId, ro);
     }
 
-    // 4. Advance Live Queue
+    // 4. Update appointment status to Completed if associated with an appointment
+    if (activeToken?.appointmentId && user) {
+      try {
+        await dbService.updateDocument('opd_appointments', activeToken.appointmentId, {
+          status: 'Completed',
+        });
+      } catch (err) {
+        console.warn('Failed to update opd_appointments status:', err);
+      }
+    }
+
+    // 5. Advance Live Queue
     if (liveQueue && activeToken) {
       const waiting = liveQueue.tokenList.filter(
         (t) => t.status === 'waiting' && t.tokenNo !== activeToken.tokenNo

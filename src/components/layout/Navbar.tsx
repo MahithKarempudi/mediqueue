@@ -22,6 +22,7 @@ import {
   Lock,
   LogOut,
   KeyRound,
+  Bot,
 } from 'lucide-react';
 
 const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
@@ -198,30 +199,47 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenMobileMenu }) => {
 
           {/* Right: Storage Status, Notifications, Role Switcher, Auth Identity */}
           <div className="flex items-center gap-2.5 sm:gap-3">
-            {/* Storage Adapter Status Badge */}
+            {/* Dataset Mode Indicator */}
             <div
-              className={`hidden xl:flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold border ${
+              className={`hidden lg:flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border shadow-2xs ${
                 isFirebaseConfigured
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  : 'bg-slate-100 text-slate-700 border-slate-200'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                  : 'bg-amber-50 text-amber-800 border-amber-300'
               }`}
               title={
                 isFirebaseConfigured
                   ? 'Active connection to Cloud Firestore & Firebase RTDB'
-                  : 'Operating on local reactive storage engine with cross-tab broadcast synchronization'
+                  : 'Academic research workspace operating on local reactive engine with deterministic clinical data'
               }
             >
               {isFirebaseConfigured ? (
                 <>
                   <Radio className="h-3.5 w-3.5 text-emerald-600 animate-pulse" />
-                  <span>Firebase Cloud Active</span>
+                  <span>Live Cloud DB</span>
                 </>
               ) : (
                 <>
-                  <Database className="h-3.5 w-3.5 text-teal-600" />
-                  <span>Local Reactive DB • Broadcast Sync</span>
+                  <Database className="h-3.5 w-3.5 text-amber-600" />
+                  <span>Synthetic Research Dataset</span>
                 </>
               )}
+            </div>
+
+            {/* AI Engine Status Indicator */}
+            <div
+              className="hidden xl:flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs"
+              title={
+                import.meta.env.VITE_GEMINI_API_KEY && import.meta.env.VITE_GEMINI_API_KEY !== 'YOUR_GEMINI_API_KEY'
+                  ? 'Live Gemini 1.5 Flash Neural Assistant'
+                  : 'Operating in deterministic clinical rule-based fallback mode'
+              }
+            >
+              <Bot className="h-3.5 w-3.5 text-teal-600" />
+              <span>
+                {import.meta.env.VITE_GEMINI_API_KEY && import.meta.env.VITE_GEMINI_API_KEY !== 'YOUR_GEMINI_API_KEY'
+                  ? 'AI: Gemini 1.5 Live'
+                  : 'AI: Clinical NLU (Rule Fallback)'}
+              </span>
             </div>
 
             {/* Notifications Popover */}
