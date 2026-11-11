@@ -741,3 +741,247 @@ export const Pagination: React.FC<PaginationProps> = ({
     </div>
   );
 };
+
+// ============================================================================
+// 11. BREADCRUMBS
+// ============================================================================
+
+export interface BreadcrumbItem {
+  label: string;
+  href?: string;
+  onClick?: () => void;
+  active?: boolean;
+}
+
+export interface BreadcrumbsProps {
+  items: BreadcrumbItem[];
+  className?: string;
+}
+
+export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, className = '' }) => {
+  return (
+    <nav aria-label="Breadcrumb" className={`flex items-center gap-1.5 text-xs text-slate-500 ${className}`}>
+      {items.map((item, index) => {
+        const isLast = index === items.length - 1;
+        return (
+          <React.Fragment key={index}>
+            {index > 0 && <span className="text-slate-400 select-none">/</span>}
+            {item.href ? (
+              <a
+                href={item.href}
+                onClick={item.onClick}
+                className="hover:text-teal-700 transition font-medium"
+              >
+                {item.label}
+              </a>
+            ) : item.onClick ? (
+              <button
+                type="button"
+                onClick={item.onClick}
+                className="hover:text-teal-700 transition font-medium"
+              >
+                {item.label}
+              </button>
+            ) : (
+              <span className={isLast || item.active ? 'font-semibold text-slate-800' : 'font-medium text-slate-500'}>
+                {item.label}
+              </span>
+            )}
+          </React.Fragment>
+        );
+      })}
+    </nav>
+  );
+};
+
+// ============================================================================
+// 12. CONFIRMATION DIALOG
+// ============================================================================
+
+export interface ConfirmationDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  variant?: 'danger' | 'warning' | 'primary';
+  loading?: boolean;
+}
+
+export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
+  open,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmLabel = 'Confirm Action',
+  cancelLabel = 'Cancel',
+  variant = 'danger',
+  loading = false,
+}) => {
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={title}
+      size="sm"
+      icon={
+        variant === 'danger' ? (
+          <AlertCircle className="w-5 h-5 text-red-600" />
+        ) : variant === 'warning' ? (
+          <AlertTriangle className="w-5 h-5 text-amber-600" />
+        ) : (
+          <CheckCircle2 className="w-5 h-5 text-mediblue-600" />
+        )
+      }
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={loading}>
+            {cancelLabel}
+          </Button>
+          <Button
+            variant={variant === 'danger' ? 'danger' : variant === 'warning' ? 'teal' : 'primary'}
+            size="sm"
+            onClick={onConfirm}
+            loading={loading}
+          >
+            {confirmLabel}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-slate-600 leading-relaxed">{message}</p>
+    </Modal>
+  );
+};
+
+// ============================================================================
+// 13. TABS COMPONENT
+// ============================================================================
+
+export interface TabItem {
+  id: string;
+  label: string;
+  icon?: React.ReactNode;
+  badge?: string | number;
+}
+
+export interface TabsProps {
+  tabs: TabItem[];
+  activeTab: string;
+  onChange: (id: string) => void;
+  className?: string;
+}
+
+export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onChange, className = '' }) => {
+  return (
+    <div className={`flex items-center gap-1 border-b border-slate-200/90 overflow-x-auto ${className}`}>
+      {tabs.map((tab) => {
+        const isActive = tab.id === activeTab;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onChange(tab.id)}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition -mb-px cursor-pointer ${
+              isActive
+                ? 'border-teal-600 text-teal-700 bg-teal-50/20'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+            }`}
+          >
+            {tab.icon && <span className="shrink-0">{tab.icon}</span>}
+            <span>{tab.label}</span>
+            {tab.badge !== undefined && (
+              <span
+                className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  isActive ? 'bg-teal-100 text-teal-800' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {tab.badge}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+// ============================================================================
+// 14. DATA TABLE PRIMITIVES
+// ============================================================================
+
+export const Table: React.FC<React.TableHTMLAttributes<HTMLTableElement>> = ({ className = '', ...props }) => (
+  <div className="w-full overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
+    <table className={`w-full text-left text-sm text-slate-700 border-collapse ${className}`} {...props} />
+  </div>
+);
+
+export const TableHeader: React.FC<React.HTMLAttributes<HTMLTableSectionElement>> = ({ className = '', ...props }) => (
+  <thead className={`bg-slate-50/90 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider ${className}`} {...props} />
+);
+
+export const TableBody: React.FC<React.HTMLAttributes<HTMLTableSectionElement>> = ({ className = '', ...props }) => (
+  <tbody className={`divide-y divide-slate-100 ${className}`} {...props} />
+);
+
+export const TableRow: React.FC<React.HTMLAttributes<HTMLTableRowElement>> = ({ className = '', ...props }) => (
+  <tr className={`transition-colors hover:bg-slate-50/60 ${className}`} {...props} />
+);
+
+export const TableHead: React.FC<React.ThHTMLAttributes<HTMLTableCellElement>> = ({ className = '', ...props }) => (
+  <th className={`px-4 py-3 text-left font-semibold text-slate-600 select-none ${className}`} {...props} />
+);
+
+export const TableCell: React.FC<React.TdHTMLAttributes<HTMLTableCellElement>> = ({ className = '', ...props }) => (
+  <td className={`px-4 py-3.5 text-slate-700 align-middle ${className}`} {...props} />
+);
+
+// ============================================================================
+// 15. TOOLTIP COMPONENT
+// ============================================================================
+
+export interface TooltipProps {
+  content: string;
+  children: React.ReactNode;
+  position?: 'top' | 'bottom' | 'left' | 'right';
+  className?: string;
+}
+
+export const Tooltip: React.FC<TooltipProps> = ({
+  content,
+  children,
+  position = 'top',
+  className = '',
+}) => {
+  const [visible, setVisible] = React.useState(false);
+
+  const posClass = {
+    top: 'bottom-full left-1/2 -translate-x-1/2 mb-2',
+    bottom: 'top-full left-1/2 -translate-x-1/2 mt-2',
+    left: 'right-full top-1/2 -translate-y-1/2 mr-2',
+    right: 'left-full top-1/2 -translate-y-1/2 ml-2',
+  }[position];
+
+  return (
+    <div
+      className={`relative inline-flex ${className}`}
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+      onFocus={() => setVisible(true)}
+      onBlur={() => setVisible(false)}
+    >
+      {children}
+      {visible && (
+        <div
+          role="tooltip"
+          className={`absolute z-50 pointer-events-none px-2.5 py-1 text-xs font-medium text-white bg-slate-900 rounded-md shadow-clinical-md whitespace-nowrap animate-fade-in ${posClass}`}
+        >
+          {content}
+        </div>
+      )}
+    </div>
+  );
+};

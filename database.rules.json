@@ -1,33 +1,47 @@
 {
   "rules": {
+    ".read": false,
+    ".write": false,
     "liveBeds": {
       "$hospitalId": {
         ".read": "auth != null",
-        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'super_admin' || ((root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin') && root.child('users').child(auth.uid).child('hospitalId').val() === $hospitalId))"
+        "$bedId": {
+          ".read": "auth != null",
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'super_admin' || ((root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin') && root.child('users').child(auth.uid).child('hospitalId').val() === $hospitalId))",
+          ".validate": "newData.hasChildren(['bedId', 'status']) && (newData.child('status').val() === 'available' || newData.child('status').val() === 'occupied' || newData.child('status').val() === 'reserved' || newData.child('status').val() === 'maintenance')"
+        }
       }
     },
     "liveQueues": {
       "$hospitalId": {
-        ".read": "auth != null",
-        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'super_admin' || ((root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin') && root.child('users').child(auth.uid).child('hospitalId').val() === $hospitalId))"
+        "$departmentId": {
+          ".read": "auth != null",
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'super_admin' || ((root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin') && root.child('users').child(auth.uid).child('hospitalId').val() === $hospitalId))",
+          ".validate": "newData.hasChildren(['currentToken', 'lastUpdated']) && newData.child('currentToken').isNumber()"
+        }
       }
     },
     "hospitalStatus": {
       "$hospitalId": {
         ".read": "auth != null",
-        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'super_admin' || (root.child('users').child(auth.uid).child('role').val() === 'hospital_admin' && root.child('users').child(auth.uid).child('hospitalId').val() === $hospitalId))"
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'super_admin' || (root.child('users').child(auth.uid).child('role').val() === 'hospital_admin' && root.child('users').child(auth.uid).child('hospitalId').val() === $hospitalId))",
+        ".validate": "newData.hasChildren(['status', 'lastUpdated'])"
       }
     },
     "emergencyCapacity": {
       "$hospitalId": {
         ".read": "auth != null",
-        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'super_admin' || ((root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin') && root.child('users').child(auth.uid).child('hospitalId').val() === $hospitalId))"
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'super_admin' || ((root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin') && root.child('users').child(auth.uid).child('hospitalId').val() === $hospitalId))",
+        ".validate": "newData.hasChildren(['traumaActive', 'lastUpdated'])"
       }
     },
     "currentTokens": {
       "$hospitalId": {
-        ".read": "auth != null",
-        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'super_admin' || ((root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin') && root.child('users').child(auth.uid).child('hospitalId').val() === $hospitalId))"
+        "$departmentId": {
+          ".read": "auth != null",
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'super_admin' || ((root.child('users').child(auth.uid).child('role').val() === 'staff' || root.child('users').child(auth.uid).child('role').val() === 'hospital_admin') && root.child('users').child(auth.uid).child('hospitalId').val() === $hospitalId))",
+          ".validate": "newData.hasChildren(['token', 'servingTime'])"
+        }
       }
     }
   }

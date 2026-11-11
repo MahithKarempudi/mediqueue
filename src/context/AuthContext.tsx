@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { User, UserRole, Patient } from '@/types';
 import { dbService } from '@/services/db';
 import { isFirebaseConfigured, auth as firebaseAuth } from '@/services/firebase';
@@ -8,129 +8,11 @@ import {
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth';
+import { ROLE_PROFILES, type RoleProfile } from './roleProfiles';
+import { AuthContext, useAuth, type AuthMode } from './useAuth';
+import { seedDatabase } from '@/services/seed';
 
-export interface RoleProfile {
-  user: User;
-  patientData?: Partial<Patient>;
-  label: string;
-  tagline: string;
-  badgeColor: string;
-}
-
-export const ROLE_PROFILES: Record<UserRole, RoleProfile> = {
-  patient: {
-    user: {
-      uid: 'usr_patient_01',
-      name: 'Priya Sharma',
-      email: 'priya.sharma@mediqueue.org',
-      role: 'patient',
-      patientId: 'pat_001',
-      phone: '+91 98201 12345',
-      createdAt: new Date().toISOString(),
-    },
-    patientData: {
-      patientId: 'pat_001',
-      userId: 'usr_patient_01',
-      name: 'Priya Sharma',
-      dob: '1992-04-14',
-      gender: 'female',
-      phone: '+91 98201 12345',
-      address: 'Flat 402, Lotus Enclave, Sector 14, New Delhi',
-      bloodGroup: 'B+',
-    },
-    label: 'Patient',
-    tagline: 'Book OPD, track live token queue, check bed availability, view records & bills',
-    badgeColor: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
-  },
-  staff: {
-    user: {
-      uid: 'usr_staff_01',
-      name: 'Dr. Rajesh Kumar',
-      email: 'rajesh.kumar@mediqueue.org',
-      role: 'staff',
-      hospitalId: 'hosp_metro_01',
-      departmentId: 'dept_cardio_01',
-      phone: '+91 98111 22334',
-      createdAt: new Date().toISOString(),
-    },
-    label: 'Hospital Staff (Doctor)',
-    tagline: 'Call OPD tokens, write prescriptions, order labs, update live bed statuses',
-    badgeColor: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
-  },
-  hospital_admin: {
-    user: {
-      uid: 'usr_admin_01',
-      name: 'Sunita Rao',
-      email: 'sunita.rao@mediqueue.org',
-      role: 'hospital_admin',
-      hospitalId: 'hosp_metro_01',
-      phone: '+91 98333 44556',
-      createdAt: new Date().toISOString(),
-    },
-    label: 'Hospital Admin',
-    tagline: 'Manage hospital beds, department staffing, real-time census & revenue analytics',
-    badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-  },
-  government_officer: {
-    user: {
-      uid: 'usr_officer_01',
-      name: 'Vikramaditya Sen',
-      email: 'vikramaditya.sen@mediqueue.org',
-      role: 'government_officer',
-      phone: '+91 98555 66778',
-      createdAt: new Date().toISOString(),
-    },
-    label: 'Government Officer',
-    tagline: 'District-wide hospital surveillance, bed surge indicators, aggregate epidemiology',
-    badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  },
-  super_admin: {
-    user: {
-      uid: 'usr_superadmin_01',
-      name: 'Dev Anand',
-      email: 'dev.anand@mediqueue.org',
-      role: 'super_admin',
-      phone: '+91 98777 88990',
-      createdAt: new Date().toISOString(),
-    },
-    label: 'Super Admin',
-    tagline: 'System-wide infrastructure configuration, hospital onboarding, global audit logs',
-    badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
-  },
-};
-
-export type AuthMode = 'cloud_identity' | 'role_persona';
-
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  authMode: AuthMode;
-  sessionExpiresAt: string | null;
-  switchRole: (role: UserRole) => Promise<void>;
-  registerPatient: (details: {
-    name: string;
-    email: string;
-    phone: string;
-    dob: string;
-    gender: 'male' | 'female' | 'other';
-    bloodGroup: string;
-    address: string;
-  }) => Promise<User>;
-  loginWithEmailPassword: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
-  registerAccount: (details: {
-    name: string;
-    email: string;
-    pass: string;
-    role: UserRole;
-    hospitalId?: string;
-  }) => Promise<{ success: boolean; error?: string }>;
-  logout: () => Promise<void>;
-  reseedData: () => Promise<void>;
-  hasRole: (roles: UserRole | UserRole[]) => boolean;
-  canAccessHospital: (hospitalId?: string) => boolean;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export { ROLE_PROFILES, type RoleProfile, useAuth, type AuthMode };
 
 const AUTH_STORAGE_KEY = 'mediqueue_current_session_user';
 const AUTH_MODE_KEY = 'mediqueue_session_auth_mode';
@@ -141,31 +23,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [authMode, setAuthMode] = useState<AuthMode>('role_persona');
   const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(null);
+  const [isSessionExpired, setIsSessionExpired] = useState<boolean>(false);
 
   useEffect(() => {
     const initAuthAndData = async () => {
       try {
         // Auto-seed initial dataset if not already populated
-        const { seedDatabase } = await import('@/services/seed');
         await seedDatabase(false);
 
         // Check for Firebase Auth listener if Firebase is configured
         if (isFirebaseConfigured && firebaseAuth) {
           onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
             if (firebaseUser) {
+              const idTokenResult = await firebaseUser.getIdTokenResult();
+              const serverClaimRole = idTokenResult.claims.role as UserRole | undefined;
+              const serverClaimHospital = idTokenResult.claims.hospitalId as string | undefined;
+
               const cloudUsers = await dbService.getCollection<User>('users');
               const matched = cloudUsers.find((u) => u.uid === firebaseUser.uid || u.email === firebaseUser.email);
-              if (matched) {
-                setUser(matched);
-                setAuthMode('cloud_identity');
-                const exp = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
-                setSessionExpiresAt(exp);
-                localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(matched));
-                localStorage.setItem(AUTH_MODE_KEY, 'cloud_identity');
-                localStorage.setItem(AUTH_EXPIRY_KEY, exp);
-                setLoading(false);
-                return;
-              }
+
+              const resolvedUser: User = matched
+                ? {
+                    ...matched,
+                    role: serverClaimRole || matched.role,
+                    hospitalId: serverClaimHospital || matched.hospitalId,
+                  }
+                : {
+                    uid: firebaseUser.uid,
+                    name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Authenticated User',
+                    email: firebaseUser.email || '',
+                    role: serverClaimRole || 'patient',
+                    hospitalId: serverClaimHospital,
+                    createdAt: new Date().toISOString(),
+                  };
+
+              setUser(resolvedUser);
+              setAuthMode('cloud_identity');
+              setIsSessionExpired(false);
+              const exp = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
+              setSessionExpiresAt(exp);
+              localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(resolvedUser));
+              localStorage.setItem(AUTH_MODE_KEY, 'cloud_identity');
+              localStorage.setItem(AUTH_EXPIRY_KEY, exp);
+              setLoading(false);
+              return;
             }
           });
         }
@@ -177,11 +78,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Check session expiration
         if (savedExp && new Date(savedExp).getTime() < Date.now()) {
-          console.warn('Session expired, refreshing workspace session.');
+          console.warn('Session expired, clearing authenticated state.');
           localStorage.removeItem(AUTH_STORAGE_KEY);
           localStorage.removeItem(AUTH_EXPIRY_KEY);
+          setIsSessionExpired(true);
+          if (savedMode === 'cloud_identity') {
+            setUser(null);
+            setAuthMode('cloud_identity');
+            setLoading(false);
+            return;
+          }
         } else if (savedExp) {
           setSessionExpiresAt(savedExp);
+          setIsSessionExpired(false);
         }
 
         if (saved) {
@@ -216,7 +125,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const reseedData = async () => {
     setLoading(true);
-    const { seedDatabase } = await import('@/services/seed');
     await seedDatabase(true);
     setLoading(false);
   };
@@ -227,6 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (profile) {
       setUser(profile.user);
       setAuthMode('role_persona');
+      setIsSessionExpired(false);
       const exp = new Date(Date.now() + 12 * 3600 * 1000).toISOString();
       setSessionExpiresAt(exp);
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(profile.user));
@@ -252,14 +161,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       if (isFirebaseConfigured && firebaseAuth) {
         const userCred = await signInWithEmailAndPassword(firebaseAuth, email, pass);
+        const idTokenResult = await userCred.user.getIdTokenResult();
+        const serverRole = idTokenResult.claims.role as UserRole | undefined;
+        const serverHospital = idTokenResult.claims.hospitalId as string | undefined;
+
         const cloudUsers = await dbService.getCollection<User>('users');
         const matched = cloudUsers.find((u) => u.uid === userCred.user.uid || u.email === email);
         if (matched) {
-          setUser(matched);
+          const authUser: User = {
+            ...matched,
+            role: serverRole || matched.role,
+            hospitalId: serverHospital || matched.hospitalId,
+          };
+          setUser(authUser);
           setAuthMode('cloud_identity');
+          setIsSessionExpired(false);
           const exp = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
           setSessionExpiresAt(exp);
-          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(matched));
+          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authUser));
           localStorage.setItem(AUTH_MODE_KEY, 'cloud_identity');
           localStorage.setItem(AUTH_EXPIRY_KEY, exp);
           setLoading(false);
@@ -274,6 +193,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (found) {
         setUser(found);
         setAuthMode('cloud_identity');
+        setIsSessionExpired(false);
         const exp = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
         setSessionExpiresAt(exp);
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(found));
@@ -288,6 +208,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (r.user.email.toLowerCase() === email.toLowerCase()) {
           setUser(r.user);
           setAuthMode('cloud_identity');
+          setIsSessionExpired(false);
           const exp = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
           setSessionExpiresAt(exp);
           localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(r.user));
@@ -335,6 +256,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await dbService.setDocument('users', uid, newUser);
       setUser(newUser);
       setAuthMode('cloud_identity');
+      setIsSessionExpired(false);
       const exp = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
       setSessionExpiresAt(exp);
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newUser));
@@ -357,9 +279,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Firebase signout warning:', e);
       }
     }
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem(AUTH_MODE_KEY);
+    localStorage.removeItem(AUTH_EXPIRY_KEY);
+
+    // Reset to base patient persona for seamless exploration
     const defaultProfile = ROLE_PROFILES.patient.user;
     setUser(defaultProfile);
     setAuthMode('role_persona');
+    setIsSessionExpired(false);
     const exp = new Date(Date.now() + 12 * 3600 * 1000).toISOString();
     setSessionExpiresAt(exp);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(defaultProfile));
@@ -408,17 +336,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setUser(newUser);
     setAuthMode('cloud_identity');
+    setIsSessionExpired(false);
+    const exp = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
+    setSessionExpiresAt(exp);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newUser));
+    localStorage.setItem(AUTH_MODE_KEY, 'cloud_identity');
+    localStorage.setItem(AUTH_EXPIRY_KEY, exp);
     setLoading(false);
     return newUser;
   };
 
   const hasRole = (roles: UserRole | UserRole[]): boolean => {
     if (!user) return false;
-    if (Array.isArray(roles)) {
-      return roles.includes(user.role);
-    }
-    return user.role === roles;
+    const allowed = Array.isArray(roles) ? roles : [roles];
+    return allowed.includes(user.role);
   };
 
   const canAccessHospital = (hospitalId?: string): boolean => {
@@ -435,6 +366,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         authMode,
         sessionExpiresAt,
+        isSessionExpired,
         switchRole,
         registerPatient,
         loginWithEmailPassword,
@@ -448,12 +380,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 };

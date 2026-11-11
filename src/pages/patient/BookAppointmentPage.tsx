@@ -49,6 +49,9 @@ export const BookAppointmentPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [cancelStatusMessage, setCancelStatusMessage] = useState<string | null>(null);
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState<boolean>(false);
+  const [rescheduleTargetId, setRescheduleTargetId] = useState<string | null>(null);
+  const [rescheduleNewTime, setRescheduleNewTime] = useState<string>('02:00 PM');
 
   const patientId = user?.patientId || 'pat_0001';
 
@@ -210,6 +213,25 @@ export const BookAppointmentPage: React.FC = () => {
       setCancelStatusMessage(`Appointment ${appointmentId} has been cancelled and recorded in the audit ledger.`);
     } else {
       setErrorMessage(res.error || 'Unable to cancel appointment.');
+    }
+  };
+
+  const handleRescheduleExisting = async () => {
+    if (!user || !rescheduleTargetId) return;
+    const res = await aiAppointmentBackend.rescheduleAppointment(
+      {
+        appointmentId: rescheduleTargetId,
+        newSlotTime: `${selectedDate} ${rescheduleNewTime}`,
+        consentConfirmed: true,
+      },
+      user
+    );
+    if (res.success) {
+      setCancelStatusMessage(`Appointment ${rescheduleTargetId} successfully rescheduled to ${selectedDate} ${rescheduleNewTime}.`);
+      setRescheduleModalOpen(false);
+      setRescheduleTargetId(null);
+    } else {
+      setErrorMessage(res.error || 'Failed to reschedule appointment.');
     }
   };
 
@@ -525,10 +547,12 @@ export const BookAppointmentPage: React.FC = () => {
                         </span>
                         <Badge
                           variant={
-                            appt.status === 'scheduled'
-                              ? 'info'
-                              : appt.status === 'completed'
+                            appt.status === 'Confirmed' || appt.status === 'confirmed' || appt.status === 'scheduled'
                               ? 'success'
+                              : appt.status === 'Completed' || appt.status === 'completed'
+                              ? 'info'
+                              : appt.status === 'Pending' || appt.status === 'pending'
+                              ? 'warning'
                               : 'danger'
                           }
                           dot
@@ -548,20 +572,33 @@ export const BookAppointmentPage: React.FC = () => {
                         </p>
                       </div>
 
-                      {appt.status === 'scheduled' && (
-                        <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
+                      {(appt.status === 'scheduled' || appt.status === 'Confirmed' || appt.status === 'confirmed' || appt.status === 'Pending' || appt.status === 'pending') && (
+                        <div className="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
                           <Link to="/patient/queue">
-                            <Button variant="outline" size="xs">View Queue Token</Button>
+                            <Button variant="outline" size="xs">Queue Token</Button>
                           </Link>
-                          <Button
-                            variant="ghost"
-                            size="xs"
-                            className="text-red-600 hover:bg-red-50"
-                            icon={<XCircle className="w-3.5 h-3.5" />}
-                            onClick={() => handleCancelExistingAppointment(appt.appointmentId)}
-                          >
-                            Cancel Slot
-                          </Button>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              className="text-teal-700 hover:bg-teal-50"
+                              onClick={() => {
+                                setRescheduleTargetId(appt.appointmentId);
+                                setRescheduleModalOpen(true);
+                              }}
+                            >
+                              Reschedule
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              className="text-red-600 hover:bg-red-50"
+                              icon={<XCircle className="w-3.5 h-3.5" />}
+                              onClick={() => handleCancelExistingAppointment(appt.appointmentId)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -570,6 +607,40 @@ export const BookAppointmentPage: React.FC = () => {
               </div>
             )}
           </Card>
+
+          {/* Reschedule Modal */}
+          {rescheduleModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+              <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-clinical-lg border border-slate-200 animate-fade-in space-y-4">
+                <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+                  <h3 className="font-bold text-base text-slate-900">Reschedule Consultation Slot</h3>
+                  <button type="button" onClick={() => setRescheduleModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+                </div>
+                <p className="text-xs text-slate-600">
+                  Select an updated consultation time for appointment <strong className="font-mono text-slate-800">{rescheduleTargetId}</strong>.
+                </p>
+                <div>
+                  <label className="mq-label">New Consultation Time</label>
+                  <select
+                    value={rescheduleNewTime}
+                    onChange={(e) => setRescheduleNewTime(e.target.value)}
+                    className="mq-input"
+                  >
+                    <option value="09:30 AM">09:30 AM</option>
+                    <option value="10:30 AM">10:30 AM</option>
+                    <option value="11:45 AM">11:45 AM</option>
+                    <option value="02:00 PM">02:00 PM</option>
+                    <option value="03:30 PM">03:30 PM</option>
+                    <option value="04:15 PM">04:15 PM</option>
+                  </select>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="secondary" size="sm" onClick={() => setRescheduleModalOpen(false)}>Dismiss</Button>
+                  <Button variant="teal" size="sm" onClick={handleRescheduleExisting}>Confirm Reschedule</Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <Card padding="lg" className="bg-slate-50/80">
             <div className="flex items-start gap-3">

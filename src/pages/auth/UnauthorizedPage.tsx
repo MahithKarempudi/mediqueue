@@ -14,9 +14,11 @@ export const UnauthorizedPage: React.FC = () => {
         currentRole?: UserRole;
         requiredRoles?: UserRole[];
         from?: string;
+        reason?: string;
       }
     | undefined;
 
+  const isExpired = state?.reason === 'session_expired';
   const currentRole = state?.currentRole || user?.role || 'patient';
   const requiredRoles = state?.requiredRoles || [];
 
@@ -32,15 +34,17 @@ export const UnauthorizedPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#F4F6F9] flex flex-col items-center justify-center p-6 text-slate-900">
       <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-8 shadow-clinical-lg text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 border border-red-200 text-red-600">
+        <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border ${isExpired ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-red-50 border-red-200 text-red-600'}`}>
           <ShieldAlert className="h-7 w-7" />
         </div>
 
         <h1 className="mt-4 text-2xl font-bold text-slate-900 tracking-tight font-display">
-          403 — Portal Scope Restricted
+          {isExpired ? '401 — Security Session Expired' : '403 — Portal Scope Restricted'}
         </h1>
         <p className="mt-2 text-sm text-slate-600">
-          Your active stakeholder profile does not hold permission to view or mutate this clinical module.
+          {isExpired
+            ? 'Your institutional session has expired or the token deadline was exceeded. Please renew or re-select an authorized persona.'
+            : 'Your active stakeholder profile does not hold permission to view or mutate this clinical module.'}
         </p>
 
         {/* Audit Details */}
