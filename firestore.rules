@@ -68,19 +68,19 @@ service cloud.firestore {
     // 1. Users Collection (Strict Least Privilege)
     match /users/{userId} {
       allow read: if isAuthenticated() && (
-        isSelf(userId) ||
-        isSuperAdmin() ||
+        isSelf(userId) || 
+        isSuperAdmin() || 
         (isHospitalAdmin() && isSameHospital(resource.data.hospitalId))
       );
       // Patients can self-register their own profile with role 'patient' only
       allow create: if isSuperAdmin() || (
-        isAuthenticated() &&
-        isSelf(userId) &&
-        request.resource.data.role == 'patient' &&
+        isAuthenticated() && 
+        isSelf(userId) && 
+        request.resource.data.role == 'patient' && 
         !('hospitalId' in request.resource.data)
       );
       allow update: if isAuthenticated() && (
-        isSuperAdmin() ||
+        isSuperAdmin() || 
         (isSelf(userId) && isNotEscalatingPrivileges())
       );
       allow delete: if isSuperAdmin();

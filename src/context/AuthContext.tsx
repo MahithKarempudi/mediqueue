@@ -41,7 +41,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
               const cloudUsers = await dbService.getCollection<User>('users');
               const matched = cloudUsers.find((u) => u.uid === firebaseUser.uid || u.email === firebaseUser.email);
-
+              
               const resolvedUser: User = matched
                 ? {
                     ...matched,
@@ -282,7 +282,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem(AUTH_STORAGE_KEY);
     localStorage.removeItem(AUTH_MODE_KEY);
     localStorage.removeItem(AUTH_EXPIRY_KEY);
-
+    
     // Reset to base patient persona for seamless exploration
     const defaultProfile = ROLE_PROFILES.patient.user;
     setUser(defaultProfile);
