@@ -18,6 +18,26 @@ const AUTH_STORAGE_KEY = 'mediqueue_current_session_user';
 const AUTH_MODE_KEY = 'mediqueue_session_auth_mode';
 const AUTH_EXPIRY_KEY = 'mediqueue_session_expires_at';
 const EXPLICIT_LOGOUT_KEY = 'mediqueue_explicit_logout';
+const LOCAL_CREDENTIALS_KEY = 'mediqueue_local_credentials';
+
+const getLocalCredentials = (): Record<string, string> => {
+  try {
+    const raw = localStorage.getItem(LOCAL_CREDENTIALS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveLocalCredential = (email: string, pass: string) => {
+  try {
+    const creds = getLocalCredentials();
+    creds[email.toLowerCase().trim()] = pass;
+    localStorage.setItem(LOCAL_CREDENTIALS_KEY, JSON.stringify(creds));
+  } catch (e) {
+    console.warn('Failed to save local credential:', e);
+  }
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -165,39 +185,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithEmailPassword = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     setLoading(true);
     localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
+    const cleanEmail = email.toLowerCase().trim();
+
+    if (!cleanEmail || !pass) {
+      setLoading(false);
+      return { success: false, error: 'Please enter both your email address and password.' };
+    }
+
     try {
       if (isFirebaseConfigured && firebaseAuth) {
-        const userCred = await signInWithEmailAndPassword(firebaseAuth, email, pass);
-        const idTokenResult = await userCred.user.getIdTokenResult();
-        const serverRole = idTokenResult.claims.role as UserRole | undefined;
-        const serverHospital = idTokenResult.claims.hospitalId as string | undefined;
+        try {
+          const userCred = await signInWithEmailAndPassword(firebaseAuth, cleanEmail, pass);
+          const idTokenResult = await userCred.user.getIdTokenResult();
+          const serverRole = idTokenResult.claims.role as UserRole | undefined;
+          const serverHospital = idTokenResult.claims.hospitalId as string | undefined;
 
-        const cloudUsers = await dbService.getCollection<User>('users');
-        const matched = cloudUsers.find((u) => u.uid === userCred.user.uid || u.email === email);
-        if (matched) {
-          const authUser: User = {
-            ...matched,
-            role: serverRole || matched.role,
-            hospitalId: serverHospital || matched.hospitalId,
-          };
-          setUser(authUser);
-          setAuthMode('cloud_identity');
-          setIsSessionExpired(false);
-          const exp = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
-          setSessionExpiresAt(exp);
-          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authUser));
-          localStorage.setItem(AUTH_MODE_KEY, 'cloud_identity');
-          localStorage.setItem(AUTH_EXPIRY_KEY, exp);
-          setLoading(false);
-          return { success: true };
+          const cloudUsers = await dbService.getCollection<User>('users');
+          const matched = cloudUsers.find((u) => u.uid === userCred.user.uid || u.email.toLowerCase() === cleanEmail);
+          if (matched) {
+            const authUser: User = {
+              ...matched,
+              role: serverRole || matched.role,
+              hospitalId: serverHospital || matched.hospitalId,
+            };
+            setUser(authUser);
+            setAuthMode('cloud_identity');
+            setIsSessionExpired(false);
+            const exp = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
+            setSessionExpiresAt(exp);
+            localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authUser));
+            localStorage.setItem(AUTH_MODE_KEY, 'cloud_identity');
+            localStorage.setItem(AUTH_EXPIRY_KEY, exp);
+            setLoading(false);
+            return { success: true };
+          }
+        } catch (fbErr: any) {
+          console.warn('Firebase sign-in info (checking local credentials):', fbErr.message);
         }
       }
 
       // Check registered users in persistence engine
       const allUsers = await dbService.getCollection<User>('users');
-      const found = allUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
+      const found = allUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+
+      const localCreds = getLocalCredentials();
+      const expectedPass = localCreds[cleanEmail];
 
       if (found) {
+        if (expectedPass && expectedPass !== pass) {
+          setLoading(false);
+          return { success: false, error: 'Incorrect password. Please verify your credentials and try again.' };
+        }
+
         setUser(found);
         setAuthMode('cloud_identity');
         setIsSessionExpired(false);
@@ -212,7 +251,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // If matching predefined role email
       for (const r of Object.values(ROLE_PROFILES)) {
-        if (r.user.email.toLowerCase() === email.toLowerCase()) {
+        if (r.user.email.toLowerCase() === cleanEmail) {
+          if (expectedPass && expectedPass !== pass) {
+            setLoading(false);
+            return { success: false, error: 'Incorrect password. Please verify your credentials and try again.' };
+          }
+
           setUser(r.user);
           setAuthMode('cloud_identity');
           setIsSessionExpired(false);
@@ -227,7 +271,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       setLoading(false);
-      return { success: false, error: 'Invalid credentials. User not found in institutional directory.' };
+      return { success: false, error: 'No account found with this email. Please register as a new user or check your spelling.' };
     } catch (err: any) {
       setLoading(false);
       return { success: false, error: err.message || 'Authentication failed.' };
@@ -240,27 +284,81 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     pass: string;
     role: UserRole;
     hospitalId?: string;
+    phone?: string;
+    gender?: 'male' | 'female' | 'other';
+    bloodGroup?: string;
+    dob?: string;
+    address?: string;
   }): Promise<{ success: boolean; error?: string }> => {
     setLoading(true);
+    localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
+    const cleanEmail = details.email.toLowerCase().trim();
+
+    if (!details.name || details.name.trim().length < 2) {
+      setLoading(false);
+      return { success: false, error: 'Please enter your full name (at least 2 characters).' };
+    }
+
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      setLoading(false);
+      return { success: false, error: 'Please enter a valid email address.' };
+    }
+
+    if (!details.pass || details.pass.length < 6) {
+      setLoading(false);
+      return { success: false, error: 'Password must be at least 6 characters in length.' };
+    }
+
     try {
+      const existingUsers = await dbService.getCollection<User>('users');
+      if (existingUsers.some((u) => u.email.toLowerCase() === cleanEmail)) {
+        setLoading(false);
+        return { success: false, error: 'An account with this email address already exists. Please sign in instead.' };
+      }
+
       let uid = `user_${Date.now()}`;
 
       if (isFirebaseConfigured && firebaseAuth) {
-        const userCred = await createUserWithEmailAndPassword(firebaseAuth, details.email, details.pass);
-        uid = userCred.user.uid;
+        try {
+          const userCred = await createUserWithEmailAndPassword(firebaseAuth, cleanEmail, details.pass);
+          uid = userCred.user.uid;
+        } catch (fbErr: any) {
+          console.warn('Firebase createUser warning (continuing with local registration):', fbErr.message);
+        }
       }
+
+      const patientId = details.role === 'patient' ? `pat_${Date.now().toString().slice(-4)}` : undefined;
 
       const newUser: User = {
         uid,
         role: details.role,
-        name: details.name,
-        email: details.email,
-        hospitalId: details.hospitalId,
-        patientId: details.role === 'patient' ? `pat_${Date.now().toString().slice(-4)}` : undefined,
+        name: details.name.trim(),
+        email: cleanEmail,
+        phone: details.phone || '',
+        hospitalId: details.role === 'patient' ? undefined : details.hospitalId,
+        patientId,
         createdAt: new Date().toISOString(),
       };
 
       await dbService.setDocument('users', uid, newUser);
+
+      if (details.role === 'patient' && patientId) {
+        const newPatient: Patient = {
+          patientId,
+          userId: uid,
+          name: details.name.trim(),
+          dob: details.dob || '1995-01-01',
+          gender: details.gender || 'other',
+          phone: details.phone || '',
+          address: details.address || '',
+          bloodGroup: details.bloodGroup || 'O+',
+          createdAt: new Date().toISOString(),
+        };
+        await dbService.setDocument('patients', patientId, newPatient);
+      }
+
+      saveLocalCredential(cleanEmail, details.pass);
+
       setUser(newUser);
       setAuthMode('cloud_identity');
       setIsSessionExpired(false);

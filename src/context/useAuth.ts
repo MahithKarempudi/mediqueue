@@ -26,6 +26,11 @@ export interface AuthContextType {
     pass: string;
     role: UserRole;
     hospitalId?: string;
+    phone?: string;
+    gender?: 'male' | 'female' | 'other';
+    bloodGroup?: string;
+    dob?: string;
+    address?: string;
   }) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   reseedData: () => Promise<void>;

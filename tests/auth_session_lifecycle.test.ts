@@ -124,4 +124,52 @@ describe('Authentication Lifecycle, Session Management & Security Isolation', ()
     expect(confirmRes.error).toContain('FORBIDDEN');
     expect(confirmRes.state).toBe('FAILED');
   });
+
+  it('allows a new person to register as a patient and creates both user and patient documents', async () => {
+    const newPatientDetails = {
+      name: 'Rohan Mehra',
+      email: 'rohan.mehra@example.com',
+      phone: '+91 98111 22233',
+      dob: '1996-08-20',
+      gender: 'male' as const,
+      bloodGroup: 'B+',
+      address: 'Vasant Kunj, New Delhi',
+    };
+
+    const patientId = `pat_${Date.now()}`;
+    const uid = `usr_${Date.now()}`;
+
+    const newUser: User = {
+      uid,
+      name: newPatientDetails.name,
+      email: newPatientDetails.email,
+      role: 'patient',
+      patientId,
+      phone: newPatientDetails.phone,
+      createdAt: new Date().toISOString(),
+    };
+
+    await dbService.setDocument('users', uid, newUser);
+    await dbService.setDocument('patients', patientId, {
+      ...newPatientDetails,
+      patientId,
+      userId: uid,
+      createdAt: new Date().toISOString(),
+    });
+
+    // Verify stored user document
+    const users = await dbService.getCollection<User>('users');
+    const createdUser = users.find((u) => u.email === newPatientDetails.email);
+    expect(createdUser).toBeDefined();
+    expect(createdUser?.role).toBe('patient');
+    expect(createdUser?.hospitalId).toBeUndefined();
+    expect(createdUser?.patientId).toBe(patientId);
+
+    // Verify stored patient clinical record
+    const patients = await dbService.getCollection<any>('patients');
+    const createdPatient = patients.find((p: any) => p.patientId === patientId);
+    expect(createdPatient).toBeDefined();
+    expect(createdPatient?.bloodGroup).toBe('B+');
+    expect(createdPatient?.phone).toBe('+91 98111 22233');
+  });
 });

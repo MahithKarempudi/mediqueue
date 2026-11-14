@@ -381,7 +381,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenMobileMenu }) => {
             </div>
 
             {/* User Profile Pill / Identity Modal Trigger */}
-            {user && (
+            {user ? (
               <button
                 type="button"
                 onClick={() => setAuthModalOpen(true)}
@@ -406,6 +406,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenMobileMenu }) => {
                     {user.hospitalId ? user.hospitalId : user.email}
                   </p>
                 </div>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate('/login')}
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-teal-500 transition cursor-pointer"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>Sign In / Register</span>
               </button>
             )}
           </div>
