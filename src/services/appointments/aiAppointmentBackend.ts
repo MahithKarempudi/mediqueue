@@ -2,7 +2,7 @@
 // Principle: The AI or standard booking workflow may search, recommend and prepare an appointment,
 // but only the authenticated backend can authorize and atomically commit the booking.
 
-import type { User, Hospital, Department, Staff, OpdAppointment, QueueToken, LiveQueue } from '@/types';
+import type { User, Hospital, Department, Staff, OpdAppointment, QueueToken, LiveQueue, Notification } from '@/types';
 import type {
   AppointmentSlot,
   BookingIntent,
@@ -380,6 +380,17 @@ export const aiAppointmentBackend = {
       };
       await dbService.setDocument('opd_appointments', authoritativeAppointmentId, newAppointment);
 
+      // Create persistent confirmation notification
+      const notifId = `notif_bk_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const bookingNotif: Notification = {
+        notificationId: notifId,
+        userId: caller.uid,
+        message: `Appointment Confirmed: ${authoritativeAppointmentId} with ${intent.doctorName} on ${intent.requestedDate} at ${intent.preferredTime}. Assigned OPD Token #${assignedTokenNo}.`,
+        read: false,
+        createdAt: new Date().toISOString(),
+      };
+      await dbService.setDocument('notifications', notifId, bookingNotif);
+
       // Transition state to CONFIRMED
       intent.status = 'CONFIRMED';
 
@@ -502,6 +513,16 @@ export const aiAppointmentBackend = {
       details: `Appointment ${params.appointmentId} cancelled by ${caller.role}. Reason: ${params.reason}`,
     });
 
+    // Create persistent cancellation notification
+    const cancelNotifId = `notif_cx_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    await dbService.setDocument('notifications', cancelNotifId, {
+      notificationId: cancelNotifId,
+      userId: caller.uid,
+      message: `Appointment Cancelled: Consultation ${params.appointmentId} has been cancelled. (${params.reason})`,
+      read: false,
+      createdAt: new Date().toISOString(),
+    });
+
     return { success: true };
   },
 
@@ -537,6 +558,16 @@ export const aiAppointmentBackend = {
       hospitalId: appointment.hospitalId,
       targetPatientId: appointment.patientId,
       details: `Rescheduled appointment ${params.appointmentId} to new slot: ${params.newSlotTime}.`,
+    });
+
+    // Create persistent reschedule notification
+    const reschedNotifId = `notif_rs_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    await dbService.setDocument('notifications', reschedNotifId, {
+      notificationId: reschedNotifId,
+      userId: caller.uid,
+      message: `Appointment Rescheduled: Consultation ${params.appointmentId} moved to ${params.newSlotTime}.`,
+      read: false,
+      createdAt: new Date().toISOString(),
     });
 
     return { success: true };
@@ -577,6 +608,16 @@ export const aiAppointmentBackend = {
       details: `Appointment ${params.appointmentId} rejected by ${caller.role}. Rationale: ${params.reason}`,
     });
 
+    // Create persistent rejection notification for patient
+    const rejNotifId = `notif_rj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    await dbService.setDocument('notifications', rejNotifId, {
+      notificationId: rejNotifId,
+      userId: appointment.patientId,
+      message: `Appointment Update: ${params.appointmentId} could not be confirmed. Clinical rationale: ${params.reason}`,
+      read: false,
+      createdAt: new Date().toISOString(),
+    });
+
     return { success: true };
   },
 
@@ -613,6 +654,16 @@ export const aiAppointmentBackend = {
       hospitalId: appointment.hospitalId,
       targetPatientId: appointment.patientId,
       details: `Consultation completed for appointment ${params.appointmentId}.`,
+    });
+
+    // Create persistent completion notification for patient
+    const compNotifId = `notif_cp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    await dbService.setDocument('notifications', compNotifId, {
+      notificationId: compNotifId,
+      userId: appointment.patientId,
+      message: `Consultation Completed: Your consultation for appointment ${params.appointmentId} has concluded. Records and prescriptions are ready in your portal.`,
+      read: false,
+      createdAt: new Date().toISOString(),
     });
 
     return { success: true };

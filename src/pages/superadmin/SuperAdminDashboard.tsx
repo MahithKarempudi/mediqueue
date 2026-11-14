@@ -230,8 +230,8 @@ export const SuperAdminDashboard: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <FileSearch className="w-5 h-5 text-emerald-600" />
                   <div>
-                    <h4 className="text-sm font-bold text-slate-900">Cryptographic Forensics Ledger</h4>
-                    <p className="text-xs text-slate-500">Verify SHA-256 hash chain integrity across all events</p>
+                    <h4 className="text-sm font-bold text-slate-900">Clinical Audit Trail Ledger</h4>
+                    <p className="text-xs text-slate-500">Verify immutable event log integrity across all clinical actions</p>
                   </div>
                 </div>
                 <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-mediblue-600" />

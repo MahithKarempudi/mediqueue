@@ -17,6 +17,7 @@ export { ROLE_PROFILES, type RoleProfile, useAuth, type AuthMode };
 const AUTH_STORAGE_KEY = 'mediqueue_current_session_user';
 const AUTH_MODE_KEY = 'mediqueue_session_auth_mode';
 const AUTH_EXPIRY_KEY = 'mediqueue_session_expires_at';
+const EXPLICIT_LOGOUT_KEY = 'mediqueue_explicit_logout';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -72,6 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         // Restore saved session if any
+        const explicitLogout = localStorage.getItem(EXPLICIT_LOGOUT_KEY);
         const saved = localStorage.getItem(AUTH_STORAGE_KEY);
         const savedMode = (localStorage.getItem(AUTH_MODE_KEY) as AuthMode) || 'role_persona';
         const savedExp = localStorage.getItem(AUTH_EXPIRY_KEY);
@@ -82,15 +84,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.removeItem(AUTH_STORAGE_KEY);
           localStorage.removeItem(AUTH_EXPIRY_KEY);
           setIsSessionExpired(true);
-          if (savedMode === 'cloud_identity') {
-            setUser(null);
-            setAuthMode('cloud_identity');
-            setLoading(false);
-            return;
-          }
+          setUser(null);
+          setLoading(false);
+          return;
         } else if (savedExp) {
           setSessionExpiresAt(savedExp);
           setIsSessionExpired(false);
+        }
+
+        if (explicitLogout === 'true') {
+          setUser(null);
+          setLoading(false);
+          return;
         }
 
         if (saved) {
@@ -131,6 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const switchRole = async (role: UserRole) => {
     setLoading(true);
+    localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
     const profile = ROLE_PROFILES[role];
     if (profile) {
       setUser(profile.user);
@@ -158,6 +164,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithEmailPassword = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     setLoading(true);
+    localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
     try {
       if (isFirebaseConfigured && firebaseAuth) {
         const userCred = await signInWithEmailAndPassword(firebaseAuth, email, pass);
@@ -279,20 +286,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Firebase signout warning:', e);
       }
     }
+    localStorage.setItem(EXPLICIT_LOGOUT_KEY, 'true');
     localStorage.removeItem(AUTH_STORAGE_KEY);
     localStorage.removeItem(AUTH_MODE_KEY);
     localStorage.removeItem(AUTH_EXPIRY_KEY);
     
-    // Reset to base patient persona for seamless exploration
-    const defaultProfile = ROLE_PROFILES.patient.user;
-    setUser(defaultProfile);
-    setAuthMode('role_persona');
+    // Truly clear user session for authenticated logout
+    setUser(null);
     setIsSessionExpired(false);
-    const exp = new Date(Date.now() + 12 * 3600 * 1000).toISOString();
-    setSessionExpiresAt(exp);
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(defaultProfile));
-    localStorage.setItem(AUTH_MODE_KEY, 'role_persona');
-    localStorage.setItem(AUTH_EXPIRY_KEY, exp);
+    setSessionExpiresAt(null);
     setLoading(false);
   };
 

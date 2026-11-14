@@ -128,6 +128,7 @@ export interface ChainVerificationResult {
   totalBlocks: number;
   totalEvents: number;
   brokenIndex?: number;
+  brokenAtIndex?: number;
   brokenAtSequence?: number;
   brokenEventId?: string;
   error?: string;

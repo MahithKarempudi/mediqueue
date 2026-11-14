@@ -1,0 +1,14 @@
+name = "mediqueue"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Static Assets with Single Page Application (SPA) routing fallback
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+binding = "ASSETS"
+
+[vars]
+ENVIRONMENT = "production"
+

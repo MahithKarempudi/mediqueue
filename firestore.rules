@@ -304,15 +304,21 @@ service cloud.firestore {
     }
 
     // 16. Audit Log Records (Append-only by backend/authorized staff, no deletion)
+    match /system_audit_logs/{eventId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isHospitalAdmin());
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Append-only immutable audit trail
+    }
     match /forensic_audit_events/{eventId} {
       allow read: if isAuthenticated() && (isSuperAdmin() || isHospitalAdmin());
       allow create: if isAuthenticated();
       allow update, delete: if false; // Append-only immutable audit trail
     }
 
-    // 17. Notifications
+    // 17. Notifications (Patient / Staff-specific and broadcast system notifications)
     match /notifications/{notificationId} {
-      allow read, update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.userId == 'all');
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated();
       allow delete: if false;
     }

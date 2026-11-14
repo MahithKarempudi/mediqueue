@@ -144,7 +144,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenMobileMenu }) => {
   const handleLogoutAction = async () => {
     await logout();
     setAuthModalOpen(false);
-    navigate('/patient/dashboard');
+    navigate('/login');
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;

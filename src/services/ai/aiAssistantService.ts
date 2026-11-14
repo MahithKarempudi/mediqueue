@@ -52,125 +52,8 @@ export interface AiToolResult {
   engineMode?: 'GEMINI_LLM_LIVE' | 'CLINICAL_NLU_DETERMINISTIC';
 }
 
-// Gemini Function Calling Tool Declarations Schema
-const GEMINI_TOOLS_SCHEMA = [
-  {
-    name: 'search_doctors',
-    description: 'Search for available specialist physicians by department, specialty, hospital, or doctor name.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        specialty: { type: 'STRING', description: 'Medical specialty e.g. Cardiology, Orthopedics, Pediatrics' },
-        hospitalId: { type: 'STRING', description: 'Target hospital identifier e.g. hosp_metro_01' },
-        doctorName: { type: 'STRING', description: 'Physician name query e.g. Dr. Rajesh Kumar' },
-      },
-    },
-  },
-  {
-    name: 'get_doctor_availability',
-    description: 'Query available OPD consultation appointment slots for a specific doctor, specialty, or date.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        specialty: { type: 'STRING', description: 'Specialty e.g. Cardiology' },
-        hospitalId: { type: 'STRING', description: 'Hospital ID' },
-        doctorId: { type: 'STRING', description: 'Physician ID' },
-        date: { type: 'STRING', description: 'Date in YYYY-MM-DD format' },
-      },
-    },
-  },
-  {
-    name: 'search_hospitals',
-    description: 'Find hospital facilities by name, district, type, or emergency availability.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        district: { type: 'STRING', description: 'District name e.g. Central, North, South' },
-        emergencyOnly: { type: 'BOOLEAN', description: 'Filter only facilities with active emergency services' },
-      },
-    },
-  },
-  {
-    name: 'get_appointment_details',
-    description: 'Retrieve authorized appointment records and statuses for the signed-in patient or authorized hospital.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        appointmentId: { type: 'STRING', description: 'Specific appointment ID (optional)' },
-      },
-    },
-  },
-  {
-    name: 'create_appointment',
-    description: 'Prepare an authoritative appointment booking intent with a 5-minute hold requiring explicit patient confirmation.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        specialty: { type: 'STRING', description: 'Medical specialty' },
-        hospitalId: { type: 'STRING', description: 'Hospital ID' },
-        doctorId: { type: 'STRING', description: 'Doctor ID' },
-        date: { type: 'STRING', description: 'Date in YYYY-MM-DD' },
-        time: { type: 'STRING', description: 'Time slot e.g. 10:30 AM' },
-        consultationType: { type: 'STRING', description: 'In-Person OPD or Telehealth Video' },
-      },
-      required: ['specialty'],
-    },
-  },
-  {
-    name: 'cancel_appointment',
-    description: 'Cancel an existing scheduled appointment with explicit verification and immutable audit trail.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        appointmentId: { type: 'STRING', description: 'Appointment ID e.g. APT-2026-10001' },
-        reason: { type: 'STRING', description: 'Reason for cancellation' },
-      },
-      required: ['appointmentId'],
-    },
-  },
-  {
-    name: 'reschedule_appointment',
-    description: 'Reschedule an existing scheduled appointment to a new date and time slot.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        appointmentId: { type: 'STRING', description: 'Appointment ID' },
-        newSlotTime: { type: 'STRING', description: 'New date and time e.g. 2026-10-26 11:45 AM' },
-      },
-      required: ['appointmentId', 'newSlotTime'],
-    },
-  },
-  {
-    name: 'get_queue_status',
-    description: 'Check real-time outpatient department queue token, serving status, and estimated wait time.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        hospitalId: { type: 'STRING', description: 'Hospital ID' },
-        departmentId: { type: 'STRING', description: 'Department ID' },
-      },
-    },
-  },
-  {
-    name: 'get_bed_availability',
-    description: 'Retrieve real-time inpatient ward and ICU bed census, availability, and occupancy rate.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        hospitalId: { type: 'STRING', description: 'Hospital ID' },
-        bedType: { type: 'STRING', description: 'ICU, general, emergency, pediatric, or maternity' },
-      },
-    },
-  },
-  {
-    name: 'get_patient_profile',
-    description: 'Retrieve the verified clinical identity, UHID, blood group, and contact information of the current patient.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {},
-    },
-  },
-];
+import { GEMINI_TOOLS_SCHEMA } from './toolSchema';
+export { GEMINI_TOOLS_SCHEMA };
 
 export const aiAssistantService = {
   // -------------------------------------------------------------
@@ -788,57 +671,54 @@ export const aiAssistantService = {
   },
 
   // -------------------------------------------------------------
-  // Live Gemini API Calling (when VITE_GEMINI_API_KEY is provided)
+  // Server-Side LLM Calling via Secure Backend API
+  // Secret API keys are never stored or exposed in client bundles.
   // -------------------------------------------------------------
   async callGeminiLLM(promptText: string, caller: User): Promise<AiToolResult | null> {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey || apiKey === '' || apiKey === 'YOUR_GEMINI_API_KEY') {
-      return null;
-    }
-
     try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-      const systemInstruction = `You are the MediQueue Healthcare AI Assistant. You assist patients, hospital staff, and administrators with doctor discovery, appointment booking, OPD queues, bed occupancy, and patient profiles.
-Caller Context: Name: ${caller.name}, Role: ${caller.role}, Facility: ${caller.hospitalId || 'General'}.
-Always call tools when the user requests information or actions. Never fabricate clinical appointments or bed numbers without calling tools.`;
-
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/ai-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: promptText }] }],
-          systemInstruction: { parts: [{ text: systemInstruction }] },
-          tools: [{ functionDeclarations: GEMINI_TOOLS_SCHEMA }],
+          prompt: promptText,
+          caller: {
+            uid: caller.uid,
+            name: caller.name,
+            role: caller.role,
+            hospitalId: caller.hospitalId,
+            patientId: caller.patientId,
+          },
         }),
       });
 
       if (!response.ok) {
-        console.warn('Gemini API call failed, falling back to Deterministic Clinical NLU:', response.statusText);
         return null;
       }
 
       const data = await response.json();
-      const candidate = data.candidates?.[0]?.content?.parts?.[0];
+      if (data.fallback) {
+        return null;
+      }
 
-      if (candidate?.functionCall) {
-        const { name, args } = candidate.functionCall;
+      if (data.functionCall) {
+        const { name, args } = data.functionCall;
         const toolResult = await this.executeTool(name, args || {}, caller);
         toolResult.engineMode = 'GEMINI_LLM_LIVE';
         return toolResult;
       }
 
-      if (candidate?.text) {
+      if (data.text) {
         return {
           toolName: 'gemini_conversational',
           success: true,
-          message: candidate.text,
+          message: data.text,
           engineMode: 'GEMINI_LLM_LIVE',
         };
       }
 
       return null;
-    } catch (err) {
-      console.warn('Gemini invocation error, falling back to Deterministic Clinical NLU:', err);
+    } catch {
+      // Offline / network failure / testing environment fallback
       return null;
     }
   },

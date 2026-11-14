@@ -33,9 +33,9 @@ export const SuperAdminLogsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        badge="Tamper-Evident Security Forensics"
-        title="SHA-256 Cryptographic Audit Log Ledger"
-        subtitle="Immutable hash-chained security events capturing slot searches, booking intents, consent checks, and RBAC rejections."
+        badge="HIPAA §164.312 System Audit Controls"
+        title="Clinical Audit Trail & System Event Logs"
+        subtitle="Append-only verifiable event logs capturing clinical scheduling, booking authorization, consent verification, and RBAC security events."
         actions={
           <Button
             variant="secondary"
@@ -43,7 +43,7 @@ export const SuperAdminLogsPage: React.FC = () => {
             icon={<RefreshCw className="w-4 h-4 text-mediteal-400" />}
             onClick={refreshAuditLedger}
           >
-            Re-Verify Hash Chain Integrity
+            Re-Verify Audit Log Integrity
           </Button>
         }
       />
@@ -57,13 +57,13 @@ export const SuperAdminLogsPage: React.FC = () => {
             </div>
             <div>
               <h3 className="text-sm font-bold text-white">
-                Cryptographic Chain Verification: {integrity.valid ? 'PASSED' : 'TAMPER DETECTED'}
+                Audit Trail Integrity Verification: {integrity.valid ? 'PASSED (UNALTERED)' : 'TAMPER DETECTED'}
               </h3>
               <p className="text-xs text-slate-400">{integrity.details}</p>
             </div>
           </div>
           <Badge variant={integrity.valid ? 'teal' : 'danger'} dot>
-            {integrity.totalEvents} Chained Blocks
+            {integrity.totalEvents} Verified Records
           </Badge>
         </div>
       </Card>

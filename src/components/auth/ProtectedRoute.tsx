@@ -37,7 +37,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (isSessionExpired || checkIsExpired(sessionExpiresAt)) {
     return (
       <Navigate
-        to="/unauthorized"
+        to="/login"
         state={{
           reason: 'session_expired',
           from: location.pathname,
@@ -48,7 +48,15 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!user) {
-    return <Navigate to="/patient/dashboard" replace />;
+    return (
+      <Navigate
+        to="/login"
+        state={{
+          from: location.pathname,
+        }}
+        replace
+      />
+    );
   }
 
   if (allowedRoles && !hasRole(allowedRoles)) {

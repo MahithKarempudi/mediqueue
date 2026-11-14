@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { UnauthorizedPage } from '@/pages/auth/UnauthorizedPage';
+import { LoginPage } from '@/pages/auth/LoginPage';
 
 // Role Dashboards
 import { PatientDashboard } from '@/pages/patient/PatientDashboard';
@@ -48,7 +49,7 @@ import { SuperAdminLogsPage } from '@/pages/superadmin/SuperAdminLogsPage';
 const RootRedirect: React.FC = () => {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (!user) return <Navigate to="/patient/dashboard" replace />;
+  if (!user) return <Navigate to="/login" replace />;
 
   switch (user.role) {
     case 'patient':
@@ -62,7 +63,7 @@ const RootRedirect: React.FC = () => {
     case 'super_admin':
       return <Navigate to="/superadmin/dashboard" replace />;
     default:
-      return <Navigate to="/patient/dashboard" replace />;
+      return <Navigate to="/login" replace />;
   }
 };
 
@@ -71,6 +72,7 @@ export const App: React.FC = () => {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
           <Route path="/" element={<RootRedirect />} />
 
